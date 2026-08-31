@@ -124,12 +124,30 @@ async function apiRequest(endpoint, options = {}) {
     }
 
     if (!response.ok) {
-      const message =
-        data?.message ||
-        data?.detail ||
-        (typeof data === 'string'
-          ? data
-          : extractDrfMessage(data) || `Request failed (${response.status})`);
+      // The server returned a non-JSON body (typically an HTML page).
+      // This most often happens on Render free-tier: when the service has
+      // gone to sleep it replies to every request with a "service suspended"
+      // 503 HTML page instead of routing to Django. Flatten these into one
+      // clear, human-friendly message instead of dumping raw HTML.
+      const isHtml = typeof data === 'string' && /^\s*</.test(data);
+      const isSuspension =
+        response.status === 503 ||
+        response.status === 502 ||
+        (isHtml && /service (unavailable|suspended|temporarily)/i.test(data));
+
+      let message;
+      if (isSuspension) {
+        message =
+          'The backend is starting up or temporarily paused. ' +
+          'Please wait a few seconds and try again.';
+      } else {
+        message =
+          data?.message ||
+          data?.detail ||
+          (typeof data === 'string'
+            ? data
+            : extractDrfMessage(data) || `Request failed (${response.status})`);
+      }
       throw new ApiError(message, response.status, data?.errors);
     }
 

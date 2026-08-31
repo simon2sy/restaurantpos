@@ -1,0 +1,58 @@
+# Render Blueprint — Restaurant POS (Django backend)
+# Deploy from the consolidated repo: https://github.com/simon2sy/restaurantpos
+# Root directory is `config` (where manage.py lives).
+#
+# In the Render dashboard:
+#   "Blueprint" / "New +" → Import this file, or
+#   create a Web Service manually with the same values below.
+#
+# NOTE: This project's JSON APIs are consumed by the React Native (Expo) app,
+# which points at API_BASE_URL (see mobile/src/constants/config.js).
+
+databases:
+  - name: restaurant-pos-db
+    databaseName: restaurant_pos
+    user: restaurant_pos
+    plan: free
+    ipAllowList: [] # only allow internal connections
+
+  # Optional: swap to true if you want websockets (Channels) to use Redis.
+  # Leave disabled to fall back to InMemory channel layer in settings.py.
+  - name: restaurant-pos-redis
+    plan: free
+    ipAllowList: []
+
+services:
+  - type: web
+    name: restaurant-pos
+    runtime: python
+    rootDir: config
+    plan: free
+    buildCommand: ./build.sh
+    startCommand: python manage.py migrate --noinput && python manage.py create_default_admin && daphne -b 0.0.0.0 -p ${PORT:-8000} config.asgi:application
+    autoDeploy: true
+    healthCheckPath: /
+
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.12.0
+      - key: DEBUG
+        value: "False"
+      - key: SECRET_KEY
+        sync: false # set a strong one in the dashboard
+      # Comma-separated exact host(s) that may serve the app. Update to match
+      # the actual onrender URL Render assigns to this service (or your domain).
+      - key: ALLOWED_HOSTS
+        value: restaurant-pos.onrender.com
+      - key: CSRF_TRUSTED_ORIGINS
+        value: https://restaurant-pos.onrender.com
+      - key: CORS_ALLOWED_ORIGINS
+        value: https://restaurant-pos.onrender.com
+      - key: DATABASE_URL
+        fromDatabase:
+          name: restaurant-pos-db
+          property: connectionString
+      - key: REDIS_URL
+        fromDatabase:
+          name: restaurant-pos-redis
+          property: connectionString
