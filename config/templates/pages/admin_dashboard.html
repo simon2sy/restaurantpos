@@ -1,0 +1,363 @@
+{% extends "base.html" %}
+
+{% block title %}Admin Dashboard{% endblock %}
+{% block page_title %}Admin Dashboard{% endblock %}
+
+{% block content %}
+
+{# ── HERO HEADER ── #}
+<div class="dash-hero">
+    <div class="dash-hero-bg"></div>
+    <div class="dash-hero-content">
+        <div class="dash-hero-left">
+            <div class="dash-greeting-badge">
+                <div class="dash-live-pulse"></div>
+                <span>Live Dashboard</span>
+            </div>
+            <h1>Good {% if today.hour < 12 %}Morning{% elif today.hour < 17 %}Afternoon{% else %}Evening{% endif %} 👋</h1>
+            <p>Here's everything happening at the restaurant right now</p>
+            <div class="dash-hero-date">{{ today|date:"l, d M Y" }}</div>
+        </div>
+        <div class="dash-hero-right">
+            <div class="dash-hero-rings">
+                <div class="dash-ring dash-ring-1">
+                    <div class="dash-ring-inner">
+                        <span class="dash-ring-value">{{ stats.orders_today }}</span>
+                        <span class="dash-ring-label">Orders</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+{# ── KEY METRICS ── #}
+<div class="dash-section-header">
+    <h2>📊 Today's Performance</h2>
+    <div class="dash-section-line"></div>
+</div>
+
+<div class="dash-metrics-grid mt-2">
+    <div class="dash-metric glass-card">
+        <div class="dash-metric-glow glow-green"></div>
+        <div class="dash-metric-top">
+            <div class="dash-metric-icon-wrap icon-green">
+                <span>💰</span>
+            </div>
+            <div class="dash-metric-badge badge-up">Today</div>
+        </div>
+        <div class="dash-metric-value">Rs. {{ stats.revenue_today|default:"0" }}</div>
+        <div class="dash-metric-label">Revenue Earned</div>
+        <div class="dash-metric-bar">
+            <div class="dash-metric-bar-fill bar-green" style="width:75%"></div>
+        </div>
+    </div>
+
+    <div class="dash-metric glass-card">
+        <div class="dash-metric-glow glow-blue"></div>
+        <div class="dash-metric-top">
+            <div class="dash-metric-icon-wrap icon-blue">
+                <span>🧾</span>
+            </div>
+            <div class="dash-metric-badge badge-info">Active</div>
+        </div>
+        <div class="dash-metric-value">{{ stats.orders_today }}</div>
+        <div class="dash-metric-label">Orders Placed</div>
+        <div class="dash-metric-bar">
+            <div class="dash-metric-bar-fill bar-blue" style="width:60%"></div>
+        </div>
+    </div>
+
+    <div class="dash-metric glass-card">
+        <div class="dash-metric-glow glow-cyan"></div>
+        <div class="dash-metric-top">
+            <div class="dash-metric-icon-wrap icon-cyan">
+                <span>⚡</span>
+            </div>
+            <div class="dash-metric-badge badge-warn">{{ stats.open_orders }} open</div>
+        </div>
+        <div class="dash-metric-value">{{ stats.open_orders }}</div>
+        <div class="dash-metric-label">Active Orders</div>
+        <div class="dash-metric-bar">
+            <div class="dash-metric-bar-fill bar-cyan" style="width:45%"></div>
+        </div>
+    </div>
+
+    <div class="dash-metric glass-card">
+        <div class="dash-metric-glow glow-red"></div>
+        <div class="dash-metric-top">
+            <div class="dash-metric-icon-wrap icon-red">
+                <span>⚠️</span>
+            </div>
+            <div class="dash-metric-badge badge-danger">Needs attention</div>
+        </div>
+        <div class="dash-metric-value">{{ stats.unpaid_orders }}</div>
+        <div class="dash-metric-label">Unpaid Orders</div>
+        <div class="dash-metric-bar">
+            <div class="dash-metric-bar-fill bar-red" style="width:30%"></div>
+        </div>
+    </div>
+</div>
+
+{# ── OPERATIONS PANEL ── #}
+<div class="dash-section-header mt-4">
+    <h2>🏗️ Operations Overview</h2>
+    <div class="dash-section-line"></div>
+</div>
+
+<div class="dash-ops-grid mt-2">
+    <div class="dash-ops-card glass-card">
+        <div class="dash-ops-header">
+            <div class="dash-ops-icon-wrap">🪑</div>
+            <div class="dash-ops-data">
+                <span class="dash-ops-big">{{ stats.tables_occupied }}</span>
+                <span class="dash-ops-small">/ {{ stats.tables_total }}</span>
+            </div>
+        </div>
+        <div class="dash-ops-title">Tables Occupied</div>
+        <div class="dash-ops-bar-wrap">
+            {% widthratio stats.tables_occupied stats.tables_total 100 as pct %}
+            <div class="dash-ops-bar">
+                <div class="dash-ops-bar-fill gradient-bar-blue" style="width:{{ pct }}%"></div>
+            </div>
+            <span class="dash-ops-pct">{{ pct }}%</span>
+        </div>
+    </div>
+
+    <div class="dash-ops-card glass-card">
+        <div class="dash-ops-header">
+            <div class="dash-ops-icon-wrap">🛋️</div>
+            <div class="dash-ops-data">
+                <span class="dash-ops-big">{{ stats.cabins_occupied }}</span>
+                <span class="dash-ops-small">/ {{ stats.cabins_total }}</span>
+            </div>
+        </div>
+        <div class="dash-ops-title">Cabins Occupied</div>
+        <div class="dash-ops-bar-wrap">
+            {% widthratio stats.cabins_occupied stats.cabins_total 100 as pct %}
+            <div class="dash-ops-bar">
+                <div class="dash-ops-bar-fill gradient-bar-amber" style="width:{{ pct }}%"></div>
+            </div>
+            <span class="dash-ops-pct">{{ pct }}%</span>
+        </div>
+    </div>
+
+    <div class="dash-ops-card glass-card">
+        <div class="dash-ops-header">
+            <div class="dash-ops-icon-wrap">🍳</div>
+            <div class="dash-ops-data">
+                <span class="dash-ops-big">{{ stats.kitchen_pending }}</span>
+            </div>
+        </div>
+        <div class="dash-ops-title">Kitchen Queue</div>
+        <div class="dash-ops-bar-wrap">
+            <div class="dash-ops-bar">
+                {% if stats.kitchen_pending > 0 %}
+                <div class="dash-ops-bar-fill gradient-bar-amber" style="width:100%"></div>
+                {% endif %}
+            </div>
+            <span class="dash-ops-pct">{% if stats.kitchen_pending > 0 %}Busy{% else %}Clear{% endif %}</span>
+        </div>
+    </div>
+
+    <div class="dash-ops-card glass-card">
+        <div class="dash-ops-header">
+            <div class="dash-ops-icon-wrap">👥</div>
+            <div class="dash-ops-data">
+                <span class="dash-ops-big">{{ stats.active_employees }}</span>
+            </div>
+        </div>
+        <div class="dash-ops-title">Staff on Duty</div>
+        <div class="dash-ops-bar-wrap">
+            <div class="dash-ops-bar">
+                <div class="dash-ops-bar-fill gradient-bar-green" style="width:100%"></div>
+            </div>
+            <span class="dash-ops-pct">Active</span>
+        </div>
+    </div>
+</div>
+
+{# ── KITCHEN QUEUE ── #}
+<div class="dash-section-header mt-4">
+    <h2>🔥 Kitchen Queue</h2>
+    <div class="dash-section-line"></div>
+</div>
+
+{% if kitchen_queue %}
+<div class="dash-kitchen-panel glass-card mt-2">
+    <div class="dash-kitchen-tabs">
+        <span class="dash-kitchen-tab tab-active">
+            <span class="tab-dot dot-amber"></span>
+            All ({{ kitchen_queue|length }})
+        </span>
+    </div>
+    <div class="dash-kitchen-list">
+        {% for batch in kitchen_queue %}
+        <div class="dash-kitchen-item {% if batch.status == 'PREPARING' %}item-preparing{% elif batch.status == 'READY' %}item-ready{% endif %}">
+            <div class="kitchen-item-left">
+                <div class="kitchen-item-status">
+                    {% if batch.status == 'PENDING' %}
+                        <span class="status-dot dot-pending"></span>
+                    {% elif batch.status == 'PREPARING' %}
+                        <span class="status-dot dot-preparing"></span>
+                    {% else %}
+                        <span class="status-dot dot-ready"></span>
+                    {% endif %}
+                </div>
+                <div class="kitchen-item-info">
+                    <div class="kitchen-item-header">
+                        <span class="kitchen-order-num">#{{ batch.order.order_number }}</span>
+                        <span class="kitchen-batch-num">B{{ batch.batch_number }}</span>
+                    </div>
+                    <div class="kitchen-item-location">
+                        {% if batch.order.order_type == 'DELIVERY' %}
+                            🛵 Delivery{% if batch.order.delivery %} · {{ batch.order.delivery.customer_name }}{% endif %}
+                        {% else %}
+                            {{ batch.order.table|default:batch.order.cabin|default:"Takeaway" }}
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+            <div class="kitchen-item-right">
+                <span class="kitchen-status-chip {% if batch.status == 'PENDING' %}chip-pending{% elif batch.status == 'PREPARING' %}chip-preparing{% else %}chip-ready{% endif %}">
+                    {{ batch.get_status_display }}
+                </span>
+                <div class="kitchen-items-list">
+                    {% for item in batch.items.all %}
+                        <span class="kitchen-item-tag">{{ item.menu_item.name }} ×{{ item.quantity }}</span>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+{% else %}
+<div class="dash-kitchen-panel glass-card mt-2">
+    <div class="dash-empty-clean">
+        <div class="empty-clean-icon">✅</div>
+        <div class="empty-clean-text">
+            <strong>Kitchen all caught up!</strong>
+            <span>No pending batches right now.</span>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+{# ── RECENT ORDERS ── #}
+<div class="dash-section-header mt-4">
+    <h2>🧾 Recent Orders</h2>
+    <div class="dash-section-line"></div>
+</div>
+
+{% if recent_orders %}
+<div class="dash-orders-panel glass-card mt-2">
+    <div class="dash-orders-table-header">
+        <span class="ot-col ot-col-num">Order</span>
+        <span class="ot-col ot-col-type">Type</span>
+        <span class="ot-col ot-col-status">Status</span>
+        <span class="ot-col ot-col-amount">Amount</span>
+        <span class="ot-col ot-col-user">By</span>
+    </div>
+    <div class="dash-orders-body">
+        {% for order in recent_orders %}
+        <a href="{% url 'orders:order_detail' order.id %}" class="dash-order-row">
+            <span class="ot-col ot-col-num">
+                <span class="order-num-badge">#{{ order.order_number }}</span>
+            </span>
+            <span class="ot-col ot-col-type">
+                {% if order.order_type == 'DELIVERY' %}
+                    <span class="type-badge type-delivery">🛵 Delivery</span>
+                {% elif order.table %}
+                    <span class="type-badge type-table">🪑 Table {{ order.table.number }}</span>
+                {% elif order.cabin %}
+                    <span class="type-badge type-cabin">🛋 Cabin {{ order.cabin.number }}</span>
+                {% else %}
+                    <span class="type-badge type-takeaway">Takeaway</span>
+                {% endif %}
+            </span>
+            <span class="ot-col ot-col-status">
+                <span class="order-chip {% if order.status == 'COMPLETED' %}chip-done{% elif order.status == 'CANCELLED' %}chip-cancel{% elif order.status == 'OPEN' or order.status == 'PREPARING' %}chip-active{% else %}chip-default{% endif %}">
+                    {{ order.get_status_display }}
+                </span>
+                <span class="order-chip {% if order.payment_status == 'PAID' %}chip-paid{% else %}chip-unpaid{% endif %}">
+                    {{ order.get_payment_status_display }}
+                </span>
+            </span>
+            <span class="ot-col ot-col-amount">Rs. {{ order.total }}</span>
+            <span class="ot-col ot-col-user">{{ order.created_by.username }}</span>
+        </a>
+        {% endfor %}
+    </div>
+</div>
+{% else %}
+<div class="dash-orders-panel glass-card mt-2">
+    <div class="dash-empty-clean">
+        <div class="empty-clean-icon">🧾</div>
+        <div class="empty-clean-text">
+            <strong>No orders yet today</strong>
+            <span>Orders will appear here as soon as they're placed.</span>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+{# ── TEAM ── #}
+{% if employees %}
+<div class="dash-section-header mt-4">
+    <h2>👥 Team on Duty</h2>
+    <div class="dash-section-line"></div>
+</div>
+
+<div class="dash-team-grid mt-2">
+    {% for employee in employees %}
+    <div class="dash-team-card glass-card {% if not employee.is_active %}is-disabled{% endif %}">
+        <div class="dash-team-avatar {% if employee.is_active %}avatar-active{% else %}avatar-inactive{% endif %}">
+            {{ employee.user.first_name|default:employee.user.username|slice:":1"|upper }}
+        </div>
+        <div class="dash-team-info">
+            <strong>{{ employee.user.get_full_name|default:employee.user.username }}</strong>
+            <span class="dash-team-role">{{ employee.get_role_display }}</span>
+        </div>
+        <div class="dash-team-status {% if employee.is_active %}status-active{% else %}status-inactive{% endif %}">
+            {% if employee.is_active %}●{% else %}●{% endif %}
+        </div>
+    </div>
+    {% endfor %}
+</div>
+{% endif %}
+
+{# ── QUICK ACTIONS ── #}
+<div class="dash-section-header mt-4">
+    <h2>⚡ Quick Actions</h2>
+    <div class="dash-section-line"></div>
+</div>
+
+<div class="dash-actions-grid mt-2">
+    <a href="{% url 'accounts:employee_list' %}" class="dash-action glass-card">
+        <div class="dash-action-glow glow-purple"></div>
+        <span class="dash-action-icon">👥</span>
+        <span class="dash-action-text">Manage Staff</span>
+        <span class="dash-action-arrow">→</span>
+    </a>
+    <a href="{% url 'orders:seating_dashboard' %}" class="dash-action glass-card">
+        <div class="dash-action-glow glow-blue"></div>
+        <span class="dash-action-icon">◻️</span>
+        <span class="dash-action-text">Floor Plan</span>
+        <span class="dash-action-arrow">→</span>
+    </a>
+    <a href="{% url 'menu:menu_list' %}" class="dash-action glass-card">
+        <div class="dash-action-glow glow-green"></div>
+        <span class="dash-action-icon">☰</span>
+        <span class="dash-action-text">Menu</span>
+        <span class="dash-action-arrow">→</span>
+    </a>
+    <a href="{% url 'reports:dashboard' %}" class="dash-action glass-card">
+        <div class="dash-action-glow glow-cyan"></div>
+        <span class="dash-action-icon">📈</span>
+        <span class="dash-action-text">Reports</span>
+        <span class="dash-action-arrow">→</span>
+    </a>
+</div>
+
+{% endblock %}

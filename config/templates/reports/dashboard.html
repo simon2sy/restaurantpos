@@ -1,0 +1,297 @@
+{% extends "base.html" %}
+
+{% block title %}Sales Reports{% endblock %}
+{% block page_title %}Sales Reports{% endblock %}
+
+{% block content %}
+
+{# ── HERO HEADER ── #}
+<div class="report-hero">
+    <div class="report-hero-bg"></div>
+    <div class="report-hero-content">
+        <div class="report-hero-left">
+            <div class="report-hero-badge">
+                <div class="dash-live-pulse"></div>
+                <span>Financial Overview</span>
+            </div>
+            <h1>📈 Sales Reports</h1>
+            <p>Revenue analysis and performance insights</p>
+            <div class="report-hero-range">{{ range_label }}</div>
+        </div>
+    </div>
+</div>
+
+{# ── FILTER BAR ── #}
+<div class="glass-card report-filter-card mt-3">
+    <div class="report-filter-pills">
+        {% for value, label in periods %}
+        <a href="?period={{ value }}"
+           class="report-pill {% if period == value %}pill-active{% endif %}">
+            {{ label }}
+        </a>
+        {% endfor %}
+    </div>
+    <form method="get" class="report-filter-form">
+        <div class="report-filter-dates">
+            <div class="form-field" style="max-width:190px;">
+                <label for="f-from">From</label>
+                <input id="f-from" type="date" name="from" value="{{ filter_from }}">
+            </div>
+            <div class="form-field" style="max-width:190px;">
+                <label for="f-to">To</label>
+                <input id="f-to" type="date" name="to" value="{{ filter_to }}">
+            </div>
+            <button type="submit" class="btn report-apply-btn">Apply Range</button>
+            {% if period == 'custom' %}
+            <span class="status-chip st-progress">Custom range active</span>
+            {% endif %}
+        </div>
+    </form>
+</div>
+
+{# ── KEY INSIGHTS ── #}
+<div class="report-insights-grid mt-2">
+    <div class="report-insight glass-card insight-green">
+        <div class="report-insight-glow glow-green"></div>
+        <div class="report-insight-icon">💰</div>
+        <div class="report-insight-body">
+            <span class="report-insight-value">Rs. {{ summary.total_revenue|default:0 }}</span>
+            <span class="report-insight-label">Total Revenue</span>
+        </div>
+        <div class="report-insight-badge">Revenue</div>
+    </div>
+
+    <div class="report-insight glass-card insight-blue">
+        <div class="report-insight-glow glow-blue"></div>
+        <div class="report-insight-icon">🧾</div>
+        <div class="report-insight-body">
+            <span class="report-insight-value">{{ summary.total_orders|default:0 }}</span>
+            <span class="report-insight-label">Paid Orders</span>
+        </div>
+        <div class="report-insight-badge">Orders</div>
+    </div>
+
+    <div class="report-insight glass-card insight-cyan">
+        <div class="report-insight-glow glow-cyan"></div>
+        <div class="report-insight-icon">📊</div>
+        <div class="report-insight-body">
+            <span class="report-insight-value">Rs. {{ summary.avg_order|floatformat:0 }}</span>
+            <span class="report-insight-label">Avg Order Value</span>
+        </div>
+        <div class="report-insight-badge">Average</div>
+    </div>
+
+    <div class="report-insight glass-card insight-red">
+        <div class="report-insight-glow glow-red"></div>
+        <div class="report-insight-icon">⚠️</div>
+        <div class="report-insight-body">
+            <span class="report-insight-value">{{ unpaid_stats.count|default:0 }}</span>
+            <span class="report-insight-label">Unpaid · Rs. {{ unpaid_stats.amount|default:0 }}</span>
+        </div>
+        <div class="report-insight-badge">Attention</div>
+    </div>
+</div>
+
+{# ── PAYMENT METHODS + TOP ITEMS (side by side) ── #}
+<div class="report-split-grid mt-4">
+    {# Payment Methods #}
+    <div class="glass-card report-panel">
+        <div class="report-panel-header">
+            <span class="report-panel-icon">💳</span>
+            <h3>Payment Methods</h3>
+        </div>
+        <div class="report-panel-body">
+            {% for row in by_method %}
+            <div class="report-payment-row">
+                <div class="report-payment-left">
+                    <span class="report-payment-icon">{% if row.payment_method == 'CASH' %}💵{% else %}🛵{% endif %}</span>
+                    <div class="report-payment-info">
+                        <span class="report-payment-name">{% if row.payment_method == 'CASH' %}Cash{% else %}COD{% endif %}</span>
+                        <span class="report-payment-count">{{ row.orders }} order{{ row.orders|pluralize }}</span>
+                    </div>
+                </div>
+                <div class="report-payment-right">
+                    <span class="report-payment-amount">Rs. {{ row.revenue }}</span>
+                    {% if summary.total_revenue %}
+                    <span class="report-payment-pct">{% widthratio row.revenue summary.total_revenue 100 %}%</span>
+                    {% endif %}
+                </div>
+                <div class="h-bar-track report-bar-track">
+                    <div class="h-bar-fill {% if row.payment_method == 'CASH' %}h-green{% else %}h-orange{% endif %}" style="width:{% if summary.total_revenue %}{% widthratio row.revenue summary.total_revenue 100 %}{% else %}0{% endif %}%"></div>
+                </div>
+            </div>
+            {% empty %}
+            <p class="text-muted" style="margin:0;">No paid sales in this range.</p>
+            {% endfor %}
+        </div>
+    </div>
+
+    {# Top Items #}
+    <div class="glass-card report-panel">
+        <div class="report-panel-header">
+            <span class="report-panel-icon">⭐</span>
+            <h3>Top Selling Items</h3>
+        </div>
+        <div class="report-panel-body">
+            {% for t in top_items %}
+            <div class="report-item-row">
+                <span class="report-item-rank {% if forloop.counter == 1 %}rank-gold{% elif forloop.counter == 2 %}rank-silver{% elif forloop.counter == 3 %}rank-bronze{% endif %}">{{ forloop.counter }}</span>
+                <div class="report-item-info">
+                    <span class="report-item-name">{{ t.menu_item__name }}</span>
+                    <span class="report-item-meta">{{ t.items_sold }} sold</span>
+                </div>
+                <span class="report-item-amount">Rs. {{ t.revenue }}</span>
+            </div>
+            {% empty %}
+            <p class="text-muted" style="margin:0;">No item sales recorded.</p>
+            {% endfor %}
+        </div>
+    </div>
+</div>
+
+{# ── CATEGORY PERFORMANCE ── #}
+<div class="report-section-header mt-4">
+    <h2>🍽️ Category Performance</h2>
+</div>
+<div class="glass-card mt-2 report-panel">
+    <div class="report-panel-body">
+        {% for cat in by_category %}
+        {% if cat.menu_item__category__name %}
+        <div class="report-cat-row">
+            <div class="report-cat-icon">📁</div>
+            <div class="report-cat-info">
+                <span class="report-cat-name">{{ cat.menu_item__category__name }}</span>
+                <span class="report-cat-meta">{{ cat.items_sold }} item{{ cat.items_sold|pluralize }} sold</span>
+            </div>
+            <div class="report-cat-right">
+                <span class="report-cat-amount">Rs. {{ cat.revenue }}</span>
+                {% if summary.total_revenue %}
+                <span class="report-cat-pct">{% widthratio cat.revenue summary.total_revenue 100 %}% of revenue</span>
+                {% endif %}
+            </div>
+            <div class="h-bar-track report-bar-track">
+                <div class="h-bar-fill h-orange" style="width:{% if max_category %}{% widthratio cat.revenue max_category 100 %}{% else %}0{% endif %}%"></div>
+            </div>
+        </div>
+        {% endif %}
+        {% empty %}
+        <p class="text-muted" style="margin:0;">No category data available.</p>
+        {% endfor %}
+    </div>
+</div>
+
+{# ── DAILY SALES CHART ── #}
+{% if show_daily %}
+<div class="report-section-header mt-4">
+    <h2>📅 Daily Sales Trend</h2>
+</div>
+<div class="glass-card mt-2 report-panel">
+    <div class="report-panel-body">
+        {% if days %}
+        <div class="report-chart-area">
+            <div class="bar-chart report-bar-chart">
+                {% for d in days %}
+                <div class="bar-col" title="{{ d.day|date:'d M' }} — Rs. {{ d.revenue }} ({{ d.orders }} orders)">
+                    <span class="bar-value">{% if d.revenue %}{{ d.revenue|floatformat:0 }}{% endif %}</span>
+                    <div class="bar report-bar" style="height:{% if max_daily and d.revenue %}{% widthratio d.revenue max_daily 100 %}{% else %}0{% endif %}%;"></div>
+                    <span class="bar-label">{{ d.day|date:'d M' }}</span>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+        {% else %}
+        <p class="text-muted" style="margin:0;">No sales data for this period.</p>
+        {% endif %}
+    </div>
+</div>
+{% endif %}
+
+{# ── MONTHLY SALES ── #}
+<div class="report-section-header mt-4">
+    <h2>🗓️ Monthly Summary</h2>
+</div>
+<div class="glass-card mt-2 report-panel">
+    <div class="report-panel-body">
+        {% if monthly %}
+        <div class="report-monthly-list">
+            {% for m in monthly %}
+            <div class="report-monthly-row">
+                <div class="report-monthly-left">
+                    <span class="report-monthly-month">{{ m.month|date:'M' }}</span>
+                    <span class="report-monthly-year">{{ m.month|date:'Y' }}</span>
+                </div>
+                <div class="report-monthly-center">
+                    <span class="report-monthly-orders">{{ m.orders }} order{{ m.orders|pluralize }}</span>
+                </div>
+                <div class="report-monthly-right">
+                    <span class="report-monthly-amount">Rs. {{ m.revenue }}</span>
+                    <div class="h-bar-track report-bar-track">
+                        <div class="h-bar-fill" style="width:{% if max_monthly %}{% widthratio m.revenue max_monthly 100 %}{% else %}0{% endif %}%"></div>
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        {% else %}
+        <p class="text-muted" style="margin:0;">No monthly data available yet.</p>
+        {% endif %}
+    </div>
+</div>
+
+{# ── DETAILED SALES TABLE ── #}
+<div class="report-section-header mt-4">
+    <h2>📋 Recent Sales Details</h2>
+</div>
+<div class="glass-card mt-2 report-panel">
+    <div class="report-panel-subheader">
+        <span>Latest 50 paid orders in the selected range</span>
+    </div>
+    <div class="table-wrap">
+    <table>
+        <thead>
+            <tr>
+                <th>Order</th>
+                <th>Type</th>
+                <th>Customer</th>
+                <th>Items</th>
+                <th>Total</th>
+                <th>Paid via</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for order in detailed_orders %}
+            <tr>
+                <td><a href="{% url 'orders:order_detail' order.id %}"><strong>#{{ order.order_number }}</strong></a></td>
+                <td>
+                    {% if order.order_type == 'DELIVERY' %}
+                        🛵 Delivery
+                    {% elif order.table %}
+                        🪑 Table {{ order.table.number }}
+                    {% elif order.cabin %}
+                        🛋 Cabin {{ order.cabin.number }}
+                    {% else %}
+                        Takeaway
+                    {% endif %}
+                </td>
+                <td>{{ order.delivery.customer_name|default:"—" }}</td>
+                <td>
+                    {% for batch in order.batches.all %}
+                        {% for item in batch.items.all %}
+                            {{ item.menu_item.name }} ×{{ item.quantity }}{% if not forloop.last %}, {% endif %}
+                        {% endfor %}
+                    {% endfor %}
+                </td>
+                <td><strong>Rs. {{ order.total }}</strong></td>
+                <td>
+                    <span class="status-chip {% if order.payment_method == 'CASH' %}st-paid{% else %}st-progress{% endif %}">
+                        {{ order.get_payment_method_display }}
+                    </span>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    </div>
+</div>
+
+{% endblock %}

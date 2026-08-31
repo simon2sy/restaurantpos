@@ -1,0 +1,85 @@
+{% extends "base.html" %}
+
+{% block title %}Sign in{% endblock %}
+{% block page_title %}Sign in{% endblock %}
+
+{% block content %}
+<div class="login-wrapper">
+    <div class="login-logo">R</div>
+    <h1 style="text-align:center; margin-bottom: 4px;">Restaurant POS</h1>
+    <p class="login-subtitle">Sign in to your workstation</p>
+
+    <div class="card">
+        {% if form.errors %}
+        <div class="alert alert-danger">
+            {% if form.errors.get.0 %}
+                {{ form.errors.get.0 }}
+            {% else %}
+                Please enter a correct username and password.
+            {% endif %}
+        </div>
+        {% endif %}
+
+        {% if messages %}
+        {% for message in messages %}
+        <div class="alert {% if message.tags == 'error' %}alert-danger{% elif message.tags == 'warning' %}alert-warning{% else %}alert-info{% endif %}">
+            {{ message }}
+        </div>
+        {% endfor %}
+        {% endif %}
+
+        <form method="post" novalidate>
+            {% csrf_token %}
+            <div class="form-group">
+                <label for="{{ form.username.id_for_label }}">Username</label>
+                <input
+                    class="form-control"
+                    type="text"
+                    name="{{ form.username.html_name }}"
+                    id="{{ form.username.id_for_label }}"
+                    autofocus
+                    autocomplete="username"
+                    value="{{ form.username.value|default:'' }}"
+                    required>
+            </div>
+            <div class="form-group">
+                <label for="{{ form.password.id_for_label }}">Password</label>
+                <input
+                    class="form-control"
+                    type="password"
+                    name="{{ form.password.html_name }}"
+                    id="{{ form.password.id_for_label }}"
+                    autocomplete="current-password"
+                    required>
+            </div>
+            <input type="hidden" name="next" value="{{ next }}">
+            <button type="submit" class="btn btn-block btn-lg">Sign in</button>
+        </form>
+
+        <div class="qr-divider">or log in with QR</div>
+
+        <form method="post" action="{% url 'accounts:qr_entry' %}">
+            {% csrf_token %}
+            <div class="qr-entry-form">
+                <input
+                    type="text"
+                    name="token"
+                    placeholder="Paste your QR code here"
+                    autocomplete="off"
+                    required>
+                <button type="submit" class="btn btn-outline">📷 Go</button>
+            </div>
+            <p class="qr-hint">
+                📱 Scan your personal QR code from your manager, or paste its
+                code above to sign in without a password.
+            </p>
+        </form>
+
+        <hr class="divider mt-3">
+
+        <p style="text-align:center; font-size:0.9rem;">
+            Ordering delivery? <a href="{% url 'accounts:register' %}"><strong>Create a customer account →</strong></a>
+        </p>
+    </div>
+</div>
+{% endblock %}

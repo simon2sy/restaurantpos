@@ -1,0 +1,242 @@
+from decimal import Decimal
+
+from django.db import transaction
+from django.utils import timezone
+
+from .models import (
+    Cabin,
+    Order,
+    OrderBatch,
+    OrderItem,
+    Table,
+)
+
+from kitchen.services import notify_kitchen
+
+
+# ============================================================
+# CREATE ORDER
+# ============================================================
+
+@transaction.atomic
+def create_order(
+    *,
+    user,
+    table=None,
+    cabin=None,
+    order_type=Order.OrderType.DINE_IN,
+):
+
+    # ----------------------------------------------------------------
+    # DELIVERY
+    # ----------------------------------------------------------------
+
+    if order_type == Order.OrderType.DELIVERY:
+
+        # Delivery orders cannot have seating
+        if table is not None or cabin is not None:
+            raise ValueError(
+                "A delivery order cannot have a table or cabin."
+            )
+
+    # ----------------------------------------------------------------
+    # DINE IN
+    # ----------------------------------------------------------------
+
+    elif order_type == Order.OrderType.DINE_IN:
+
+        if table is not None and cabin is not None:
+            raise ValueError(
+                "An order cannot have both table and cabin."
+            )
+
+        if table is None and cabin is None:
+            raise ValueError(
+                "A dine-in order requires a table or cabin."
+            )
+
+        # TABLE
+        if table is not None:
+
+            # Lock the row for the duration of the transaction to prevent
+            # two concurrent orders from claiming the same table.
+            table = (
+                Table.objects
+                .select_for_update()
+                .get(pk=table.pk)
+            )
+
+            if table.status != Table.Status.AVAILABLE:
+                raise ValueError(
+                    "Table is not available."
+                )
+
+            table.status = Table.Status.OCCUPIED
+            table.save(update_fields=["status"])
+
+        # CABIN
+        if cabin is not None:
+
+            # Lock the row for the duration of the transaction to prevent
+            # two concurrent orders from claiming the same cabin.
+            cabin = (
+                Cabin.objects
+                .select_for_update()
+                .get(pk=cabin.pk)
+            )
+
+            if cabin.status != Cabin.Status.AVAILABLE:
+                raise ValueError(
+                    "Cabin is not available."
+                )
+
+            cabin.status = Cabin.Status.OCCUPIED
+            cabin.save(update_fields=["status"])
+
+    # ----------------------------------------------------------------
+    # INVALID TYPE
+    # ----------------------------------------------------------------
+
+    else:
+        raise ValueError(
+            "Invalid order type."
+        )
+
+    # ----------------------------------------------------------------
+    # CREATE ORDER
+    # ----------------------------------------------------------------
+
+    order = Order.objects.create(
+        order_type=order_type,
+        table=table,
+        cabin=cabin,
+        created_by=user,
+    )
+
+    return order
+# ============================================================
+# CREATE ORDER BATCH
+# ============================================================
+
+@transaction.atomic
+def create_order_batch(
+    *,
+    order,
+    items,
+):
+    """
+    Creates a new batch of food items for an order.
+
+    This is used both when:
+        1. Creating the first order
+        2. Adding more food later
+    """
+
+    last_batch = (
+        order.batches
+        .order_by("-batch_number")
+        .first()
+    )
+
+    batch_number = (
+        last_batch.batch_number + 1
+        if last_batch
+        else 1
+    )
+
+    batch = OrderBatch.objects.create(
+        order=order,
+        batch_number=batch_number,
+    )
+
+    # --------------------------------------------------------
+    # CREATE ORDER ITEMS
+    # --------------------------------------------------------
+
+    for item in items:
+
+        menu_item = item["menu_item"]
+
+        quantity = item["quantity"]
+
+        notes = item.get(
+            "notes",
+            "",
+        )
+
+        # Guard against non-positive quantities.
+        if quantity is None or quantity < 1:
+            raise ValueError(
+                "Quantity must be at least 1."
+            )
+
+        # Make sure food is still available
+        if not menu_item.is_available:
+            raise ValueError(
+                f"{menu_item.name} is unavailable."
+            )
+
+        OrderItem.objects.create(
+            batch=batch,
+            menu_item=menu_item,
+            quantity=quantity,
+            unit_price=menu_item.price,
+            notes=notes,
+        )
+
+    # --------------------------------------------------------
+    # RECALCULATE TOTAL
+    # --------------------------------------------------------
+
+    recalculate_order_total(order)
+
+    # --------------------------------------------------------
+    # NOTIFY KITCHEN
+    # --------------------------------------------------------
+
+    # Notify kitchen only after the database transaction commits.
+    transaction.on_commit(
+        lambda: notify_kitchen(batch)
+    )
+
+    return batch
+
+
+# ============================================================
+# RECALCULATE ORDER TOTAL
+# ============================================================
+
+def recalculate_order_total(order):
+
+    subtotal = Decimal("0.00")
+
+    items = OrderItem.objects.filter(
+        batch__order=order,
+        status__in=[
+            OrderItem.Status.PENDING,
+            OrderItem.Status.PREPARING,
+            OrderItem.Status.READY,
+            OrderItem.Status.SERVED,
+        ],
+    )
+
+    for item in items:
+        subtotal += item.line_total
+
+    total = (
+        subtotal
+        - order.discount
+        + order.delivery_fee
+    )
+
+    order.subtotal = subtotal
+    order.total = total
+
+    order.save(
+        update_fields=[
+            "subtotal",
+            "total",
+        ]
+    )
+
+    return order

@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <meta name="theme-color" content="#1f2937">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="Restaurant POS">
+    <title>{% block title %}Restaurant POS{% endblock %}</title>
+    {% load static %}
+    <link rel="manifest" href="{% static 'manifest.json' %}">
+    <link rel="apple-touch-icon" href="{% static 'img/icon-192.png' %}">
+    <link rel="stylesheet" href="{% static 'css/app.css' %}">
+    {% block extra_css %}{% endblock %}
+</head>
+
+<body class="layout-shell">
+
+<aside class="sidebar">
+    <div class="brand">
+        <div class="logo-fallback">R</div>
+        <div class="brand-name">Restaurant POS</div>
+    </div>
+
+    <nav class="nav">
+        {% if request.user.is_authenticated %}
+
+        {% if not request.user.employee_profile and not request.user.is_superuser %}
+        {# ── CUSTOMER navigation ── #}
+        <a href="{% url 'delivery:create_order' %}" class="{% if 'delivery' in nav_section|default:'' %}active{% endif %}">
+            <span class="nav-icon">🛵</span> Order Delivery
+        </a>
+        <a href="{% url 'menu:menu_list' %}" class="{% if 'menu' in nav_section|default:'' %}active{% endif %}">
+            <span class="nav-icon">☰</span> Menu
+        </a>
+        <a href="{% url 'delivery:cart' %}" class="{% if 'cart' in nav_section|default:'' %}active{% endif %}">
+            <span class="nav-icon">🛒</span> Cart{% if cart_count %} ({{ cart_count }}){% endif %}
+        </a>
+
+        {% else %}
+        {# ── STAFF navigation ── #}
+
+        <a href="{% url 'core:home' %}" class="{% if title_active == 'dashboard' %}active{% endif %}">
+            <span class="nav-icon">▦</span> Dashboard
+        </a>
+
+        {% if request.user.is_superuser or request.user.employee_profile.role == 'MANAGER' %}
+        <a href="{% url 'core:admin_dashboard' %}">
+            <span class="nav-icon">📊</span> Admin Overview
+        </a>
+        <a href="{% url 'reports:dashboard' %}" class="{% if 'reports' in nav_section|default:'' %}active{% endif %}">
+            <span class="nav-icon">📈</span> Sales Reports
+        </a>
+        {% endif %}
+
+        {% if not request.user.employee_profile or request.user.employee_profile.role != 'KITCHEN' %}
+        <span class="nav-spacer">Seating</span>
+
+        <a href="{% url 'orders:seating_dashboard' %}" class="{% if 'seating' in nav_section|default:'' %}active{% endif %}">
+            <span class="nav-icon">◻</span> Tables &amp; Cabins
+        </a>
+
+        <a href="{% url 'orders:seating_dashboard' %}">
+            <span class="nav-icon">✦</span> New Order
+        </a>
+        {% endif %}
+
+        {% if not request.user.employee_profile or request.user.employee_profile.role != 'WAITER' %}
+        <span class="nav-spacer">Operations</span>
+
+        <a href="{% url 'kitchen:dashboard' %}" class="{% if 'kitchen' in nav_section|default:'' %}active{% endif %}">
+            <span class="nav-icon">◉</span> Kitchen
+        </a>
+        {% endif %}
+
+        {% if not request.user.employee_profile or request.user.employee_profile.role != 'KITCHEN' %}
+        <a href="{% url 'delivery:create_order' %}" class="{% if 'delivery' in nav_section|default:'' %}active{% endif %}">
+            <span class="nav-icon">✈</span> Delivery
+        </a>
+
+        <a href="{% url 'menu:menu_list' %}" class="{% if 'menu' in nav_section|default:'' %}active{% endif %}">
+            <span class="nav-icon">☰</span> Menu
+        </a>
+        {% endif %}
+
+        {% if request.user.is_superuser or request.user.is_staff %}
+        <span class="nav-spacer">Admin</span>
+        <a href="{% url 'accounts:employee_list' %}" class="{% if 'employees' in nav_section|default:'' %}active{% endif %}">
+            <span class="nav-icon">👥</span> Employees
+        </a>
+        <a href="{% url 'admin:index' %}">
+            <span class="nav-icon">⚙</span> Administration
+        </a>
+        {% endif %}
+
+        {% endif %}
+
+        {% else %}
+        <a href="{% url 'accounts:login' %}" class="{% if title_active == 'dashboard' %}active{% endif %}">
+            <span class="nav-icon">▦</span> Sign in
+        </a>
+        <a href="{% url 'accounts:register' %}">
+            <span class="nav-icon">🛵</span> Order Delivery
+        </a>
+        {% endif %}
+    </nav>
+
+    {% if request.user.is_authenticated %}
+    <div class="sidebar-footer">
+        <div class="topbar-user">
+            <span class="role-chip">
+                {% if request.user.employee_profile %}
+                    {{ request.user.employee_profile.get_role_display }}
+                {% elif request.user.is_superuser %}
+                    Admin
+                {% else %}
+                    Customer
+                {% endif %}
+            </span>
+        </div>
+        <div class="mt-2">
+            <a href="{% url 'accounts:password_change' %}" class="btn btn-outline btn-sm btn-block" style="margin-bottom:6px;">
+                🔒 Change Password
+            </a>
+            <form method="post" action="{% url 'accounts:logout' %}">
+                {% csrf_token %}
+                <button type="submit" class="btn btn-outline btn-sm btn-block">Log out</button>
+            </form>
+        </div>
+    </div>
+    {% endif %}
+</aside>
+
+<div class="sidebar-backdrop"></div>
+
+<main class="main">
+    <header class="topbar">
+        <div class="row">
+            <button type="button" class="topbar-toggle" aria-label="Toggle menu">☰</button>
+            <div class="topbar-title">{% block page_title %}Restaurant POS{% endblock %}</div>
+        </div>
+        <div class="topbar-actions">
+            {% if request.user.is_authenticated %}
+            <span class="topbar-user">
+                👤 {{ request.user.get_full_name|default:request.user.username }}
+                {% if request.user.employee_profile %}
+                <span class="role-chip">{{ request.user.employee_profile.get_role_display }}</span>
+                {% endif %}
+            </span>
+            {% endif %}
+        </div>
+    </header>
+
+    {% if messages %}
+    <div class="toast-container" id="toast-container"></div>
+    {% endif %}
+
+    <div class="content">
+        {% block content %}{% endblock %}
+    </div>
+</main>
+
+<script src="{% static 'js/app.js' %}"></script>
+{% block scripts %}{% endblock %}
+
+{% if request.user.is_authenticated %}
+<nav class="bottom-nav">
+    {% if not request.user.employee_profile and not request.user.is_superuser %}
+    {# ── CUSTOMER bottom nav ── #}
+    <a href="{% url 'delivery:create_order' %}" class="{% if 'delivery' in nav_section|default:'' %}active{% endif %}">
+        <span class="nav-icon">🛵</span> Order
+    </a>
+    <a href="{% url 'menu:menu_list' %}" class="{% if 'menu' in nav_section|default:'' %}active{% endif %}">
+        <span class="nav-icon">☰</span> Menu
+    </a>
+    <a href="{% url 'delivery:cart' %}" class="{% if 'cart' in nav_section|default:'' %}active{% endif %}">
+        <span class="nav-icon">🛒</span> Cart{% if cart_count %} ({{ cart_count }}){% endif %}
+    </a>
+
+    {% else %}
+    <a href="{% url 'core:home' %}" class="{% if title_active == 'dashboard' %}active{% endif %}">
+        <span class="nav-icon">▦</span> Home
+    </a>
+
+    {% if not request.user.employee_profile or request.user.employee_profile.role != 'KITCHEN' %}
+    <a href="{% url 'orders:seating_dashboard' %}" class="{% if 'seating' in nav_section|default:'' %}active{% endif %}">
+        <span class="nav-icon">◻</span> Tables
+    </a>
+    {% endif %}
+
+    {% if not request.user.employee_profile or request.user.employee_profile.role != 'WAITER' %}
+    <a href="{% url 'kitchen:dashboard' %}" class="{% if 'kitchen' in nav_section|default:'' %}active{% endif %}">
+        <span class="nav-icon">◉</span> Kitchen
+    </a>
+    {% endif %}
+
+    {% if request.user.is_superuser or request.user.employee_profile.role == 'MANAGER' %}
+    <a href="{% url 'core:admin_dashboard' %}">
+        <span class="nav-icon">📊</span> Admin
+    </a>
+    <a href="{% url 'reports:dashboard' %}" class="{% if 'reports' in nav_section|default:'' %}active{% endif %}">
+        <span class="nav-icon">📈</span> Reports
+    </a>
+    {% endif %}
+    {% endif %}
+</nav>
+{% endif %}
+</body>
+</html>

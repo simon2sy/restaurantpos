@@ -1,0 +1,110 @@
+{% extends "base.html" %}
+{% block title %}QR · {{ employee.user.get_full_name|default:employee.user.username }}{% endblock %}
+{% block page_title %}Employee QR{% endblock %}
+
+{% block content %}
+
+<div class="row mb-3">
+    <a href="{% url 'accounts:employee_list' %}" class="btn btn-secondary btn-sm">← Back to employees</a>
+</div>
+
+<div class="grid grid-2">
+    <div class="card">
+        <h2 class="card-title">
+            {{ employee.user.get_full_name|default:employee.user.username }}
+        </h2>
+        <div class="row">
+            <span class="badge">{{ employee.role_display }}</span>
+            {% if employee.is_active %}
+            <span class="badge badge-available">Active</span>
+            {% else %}
+            <span class="badge badge-cancelled">Disabled</span>
+            {% endif %}
+            {% if qr_url %}
+            <span class="badge badge-available">QR issued</span>
+            {% else %}
+            <span class="badge badge-cancelled">No active QR</span>
+            {% endif %}
+        </div>
+
+        <div class="mt-4" style="display:flex; flex-direction:column; align-items:center; gap:12px;">
+            {% if qr_url %}
+                <div style="border:1px solid var(--color-border); border-radius:12px; padding:16px; background:#fff; display:inline-block;">
+                    <img src="{{ qr_url }}" alt="QR code" width="220" height="220" style="display:block;">
+                </div>
+                <p class="text-muted" style="font-size:0.85rem;">
+                    Valid for 7 days · Expires {{ employee.qr_token_expires_at|date:"M d, Y H:i" }}
+                </p>
+            {% else %}
+                <div class="empty-state" style="width:100%;">
+                    <div class="empty-icon">🔳</div>
+                    <h3>No QR issued</h3>
+                    <p>Scanned QR codes expire. Generate one to let this employee sign in.</p>
+                </div>
+            {% endif %}
+        </div>
+
+        <hr class="divider mt-4 mb-4">
+
+        <form method="post" id="qr-form">
+            {% csrf_token %}
+            {{ form.action }}
+            <div class="row">
+                {% if qr_url %}
+                <button type="button" data-action="regenerate" class="btn btn-warning qr-btn">
+                    Regenerate QR
+                </button>
+                <button type="button" data-action="revoke" class="btn btn-danger qr-btn">
+                    Revoke QR
+                </button>
+                {% else %}
+                <button type="button" data-action="generate" class="btn btn-primary qr-btn">
+                    Generate QR
+                </button>
+                {% endif %}
+            </div>
+        </form>
+        <script>
+            var qrForm = document.getElementById("qr-form");
+            var qrAction = qrForm.querySelector("select[name='action'], input[name='action']");
+            qrForm.querySelectorAll(".qr-btn").forEach(function (btn) {
+                btn.addEventListener("click", function () {
+                    if (qrAction) qrAction.value = btn.getAttribute("data-action");
+                    qrForm.submit();
+                });
+            });
+        </script>
+    </div>
+
+    <div class="card">
+        <h2 class="card-title">Recent activity</h2>
+        {% if activities %}
+        <ul style="list-style:none; margin:0; padding:0;" class="stack">
+            {% for a in activities %}
+            <li style="padding:10px 0; border-bottom:1px solid var(--color-border); display:flex; justify-content:space-between; gap:10px;">
+                <div>
+                    <strong>{{ a.get_action_display|default:a.action }}</strong>
+                    {% if a.detail %}<div class="text-muted" style="font-size:0.85rem;">{{ a.detail }}</div>{% endif %}
+                </div>
+                <span class="text-muted" style="font-size:0.8rem; white-space:nowrap;">
+                    {{ a.created_at|date:"M d, H:i" }}
+                </span>
+            </li>
+            {% endfor %}
+        </ul>
+        {% else %}
+        <div class="empty-state">
+            <div class="empty-icon">📭</div>
+            <p>No activity recorded yet.</p>
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<div class="alert alert-warning mt-3" style="max-width:700px;">
+    <strong>Security note:</strong> Regenerating or revoking a QR instantly
+    invalidates any previously printed code. Scanned codes contain only a
+    random token — no personal data.
+</div>
+
+{% endblock %}

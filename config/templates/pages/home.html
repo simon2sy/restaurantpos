@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+
+{% block title %}
+Restaurant POS
+{% endblock %}
+
+{% block content %}
+
+<div class="login-wrapper" style="text-align:center;">
+    <div class="login-logo">R</div>
+    <h1>Restaurant POS</h1>
+    <p class="login-subtitle">
+        Welcome,
+        {{ request.user.get_full_name|default:request.user.username }}
+        {% if request.user.employee_profile %}
+            · {{ request.user.employee_profile.get_role_display }}
+        {% endif %}
+    </p>
+
+    <div class="row" style="justify-content:center;">
+        <a href="{% url 'orders:seating_dashboard' %}" class="btn">◻ Floor plan</a>
+        <a href="{% url 'kitchen:dashboard' %}" class="btn btn-outline">◉ Kitchen</a>
+    </div>
+</div>
+
+{% endblock %}

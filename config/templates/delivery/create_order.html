@@ -1,0 +1,58 @@
+{% extends "base.html" %}
+
+{% block title %}
+Create Delivery Order
+{% endblock %}
+
+{% block content %}
+
+<div class="page-header">
+    <h1>🛵 New Delivery Order</h1>
+    <p>Step 1 of 2 — customer information.</p>
+</div>
+
+<div class="card" style="max-width: 640px;">
+    <form method="post">
+        {% csrf_token %}
+
+        <div class="form-grid">
+            <div class="form-field">
+                <label for="cust-name">Customer Name</label>
+                <input id="cust-name" type="text" name="customer_name"
+                       placeholder="Full name" required>
+            </div>
+
+            <div class="form-field">
+                <label for="cust-phone">Phone Number</label>
+                <input id="cust-phone" type="text" name="customer_phone"
+                       placeholder="03XX-XXXXXXX" required>
+            </div>
+
+            <div class="form-field span-2">
+                <label for="cust-address">Delivery Address</label>
+                <textarea id="cust-address" name="address" rows="3"
+                          placeholder="House / street / area" required></textarea>
+            </div>
+
+            <div class="form-field">
+                <label for="cust-landmark">Landmark (optional)</label>
+                <input id="cust-landmark" type="text" name="landmark"
+                       placeholder="Near…">
+            </div>
+
+            <div class="form-field">
+                <label>Delivery Fee</label>
+                <div style="padding:11px 13px;border:1px solid var(--color-border);border-radius:var(--radius-sm);background:#f8fafc;font-weight:600;color:var(--color-text);">
+                    Rs. 100
+                </div>
+                <input type="hidden" name="delivery_fee" value="100">
+            </div>
+        </div>
+
+        <button type="submit" class="btn btn-lg btn-block mt-4">
+            Continue to Food →
+        </button>
+    </form>
+</div>
+
+{% endblock %}

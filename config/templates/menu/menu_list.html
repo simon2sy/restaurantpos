@@ -1,0 +1,106 @@
+{% extends "base.html" %}
+
+{% block title %}
+Menu
+{% endblock %}
+
+{% block content %}
+
+<div class="page-header">
+    <h1>☰ Our Menu</h1>
+    <p>Discover our delicious selection — all freshly prepared.</p>
+    <div class="header-chips">
+        <span class="header-chip">🍽 {{ categories|length }} categories</span>
+        <a href="{% url 'orders:seating_dashboard' %}" class="header-chip" style="text-decoration:none;">
+            ＋ Create Order
+        </a>
+    </div>
+</div>
+
+<div style="
+    display: grid;
+    gap: 20px;
+    grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+">
+    {% for category in categories %}
+
+        <div class="menu-category">
+            <div class="cat-head">
+                <h2>{{ category.name }}</h2>
+                {% if category.description %}
+                    <p>{{ category.description }}</p>
+                {% endif %}
+            </div>
+
+            <div class="menu-items">
+                {% for item in category.items.all %}
+
+                    {% if item.is_available %}
+                        <div class="menu-item-row">
+                            <div>
+                                <div class="mi-name">{{ item.name }}</div>
+                                {% if item.description %}
+                                    <p class="mi-desc">{{ item.description }}</p>
+                                {% endif %}
+                                <span class="mi-price" style="margin-top:6px;">Rs. {{ item.price }}</span>
+                            </div>
+
+                            {% if is_customer %}
+                            <div class="stack" style="gap:6px;">
+                                <form method="post"
+                                      action="{% url 'delivery:cart_add' item.id %}">
+                                    {% csrf_token %}
+                                    <input type="hidden" name="qty" value="1">
+                                    <button type="submit" class="btn btn-sm btn-primary" style="width:100%;">
+                                        🛒 Add to Cart
+                                    </button>
+                                </form>
+                                <form method="post"
+                                      action="{% url 'delivery:cart_add' item.id %}">
+                                    {% csrf_token %}
+                                    <input type="hidden" name="qty" value="1">
+                                    <input type="hidden" name="order_now" value="1">
+                                    <button type="submit" class="btn btn-sm btn-success" style="width:100%;">
+                                        ⚡ Order Now
+                                    </button>
+                                </form>
+                            </div>
+                            {% endif %}
+                        </div>
+
+                    {% endif %}
+
+                {% empty %}
+
+                    <p class="seat-meta" style="text-align:center;padding:10px;">
+                        No items available in this category.
+                    </p>
+
+                {% endfor %}
+            </div>
+        </div>
+
+    {% empty %}
+
+        <div class="empty-state" style="grid-column: 1 / -1;">
+            <div class="empty-icon">📋</div>
+            <h2>Menu coming soon!</h2>
+            <p>We're currently preparing our menu. Please check back later.</p>
+        </div>
+
+    {% endfor %}
+</div>
+
+<div class="totals-card" style="position:static; margin-top:28px;">
+    {% if is_customer %}
+    <span class="text-muted">
+        🛒 {{ cart_count }} item(s) in your cart.
+    </span>
+    <a href="{% url 'delivery:cart' %}" class="btn btn-lg btn-success">View Cart &amp; Checkout →</a>
+    {% else %}
+    <span class="text-muted">Ready to order? Pick a table or cabin to get started.</span>
+    <a href="{% url 'orders:seating_dashboard' %}" class="btn btn-lg">＋ Create Order</a>
+    {% endif %}
+</div>
+
+{% endblock %}

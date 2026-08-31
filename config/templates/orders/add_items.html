@@ -1,0 +1,64 @@
+{% extends "base.html" %}
+
+{% block title %}
+Add Food
+{% endblock %}
+
+{% block content %}
+
+<div class="page-header">
+    <h1>＋ Add Food — Order #{{ order.order_number }}</h1>
+    <p>
+        {% if order.table %}Table {{ order.table.number }}{% endif %}
+        {% if order.cabin %}Cabin {{ order.cabin.number }}{% endif %}
+        · Pick extra items for this running order.
+    </p>
+</div>
+
+{% if error %}
+<div class="alert alert-danger">{{ error }}</div>
+{% endif %}
+
+<form method="post">
+    {% csrf_token %}
+
+    {% for category in categories %}
+        <div class="section-title">🍽 {{ category.name }}</div>
+
+        <div class="stack">
+        {% for item in category.items.all %}
+
+            {% if item.is_available %}
+                <div class="item-row">
+                    <div class="item-main">
+                        <div class="item-name">{{ item.name }}</div>
+                        <div class="item-price">Rs. {{ item.price }}</div>
+                    </div>
+                    <input
+                        type="number"
+                        name="quantity_{{ item.id }}"
+                        min="0"
+                        value="0"
+                        aria-label="Quantity for {{ item.name }}"
+                    >
+                    <input
+                        type="text"
+                        name="notes_{{ item.id }}"
+                        placeholder="Special request…"
+                    >
+                </div>
+            {% endif %}
+
+        {% endfor %}
+        </div>
+
+    {% endfor %}
+
+    <div class="totals-card">
+        <a href="{% url 'orders:order_detail' order.id %}" class="btn btn-outline">← Back to order</a>
+        <button type="submit" class="btn btn-lg">✓ Add to Order</button>
+    </div>
+
+</form>
+
+{% endblock %}

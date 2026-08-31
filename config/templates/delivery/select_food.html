@@ -1,0 +1,65 @@
+{% extends "base.html" %}
+
+{% block title %}
+Select Food
+{% endblock %}
+
+{% block content %}
+
+<div class="page-header">
+    <h1>🛵 Delivery Order — Select Food</h1>
+    <p>Step 2 of 2 — pick the items the customer ordered.</p>
+</div>
+
+{% if error %}
+<div class="alert alert-danger">{{ error }}</div>
+{% endif %}
+
+<form method="post">
+    {% csrf_token %}
+
+    {% for category in categories %}
+
+        <div class="section-title">🍽 {{ category.name }}</div>
+
+        <div class="stack">
+        {% for item in category.items.all %}
+
+            {% if item.is_available %}
+                <div class="item-row">
+                    <div class="item-main">
+                        <div class="item-name">{{ item.name }}</div>
+                        <div class="item-price">Rs. {{ item.price }}</div>
+                    </div>
+                    <input
+                        type="number"
+                        name="quantity_{{ item.id }}"
+                        min="0"
+                        value="0"
+                        aria-label="Quantity for {{ item.name }}"
+                    >
+                    <input
+                        type="text"
+                        name="notes_{{ item.id }}"
+                        placeholder="Special request…"
+                    >
+                </div>
+            {% endif %}
+
+        {% endfor %}
+        </div>
+
+    {% endfor %}
+
+    <div class="totals-card">
+        <a href="{% url 'delivery:create_order' %}" class="btn btn-outline">
+            ← Customer details
+        </a>
+        <button type="submit" class="btn btn-lg btn-success">
+            ✓ Place Delivery Order
+        </button>
+    </div>
+
+</form>
+
+{% endblock %}

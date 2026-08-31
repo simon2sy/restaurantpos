@@ -1,0 +1,59 @@
+{% extends "base.html" %}
+
+{% block title %}
+Payment
+{% endblock %}
+
+{% block content %}
+
+<div class="login-wrapper" style="max-width: 520px;">
+
+    <div class="total-banner">
+        <p class="total-label">Total to pay</p>
+        <p class="total-amount">Rs. {{ order.total }}</p>
+    </div>
+
+    <div class="card">
+        <h2 class="card-title">
+            Order #{{ order.order_number }}
+            {% if order.table %}· Table {{ order.table.number }}{% endif %}
+            {% if order.cabin %}· Cabin {{ order.cabin.number }}{% endif %}
+        </h2>
+
+        {% if error %}
+            <div class="alert alert-danger">{{ error }}</div>
+        {% endif %}
+
+        <form method="post">
+
+            {% csrf_token %}
+
+            <h3>Payment Method</h3>
+
+            <div class="payment-options mt-2">
+                <label class="payment-option">
+                    <input type="radio" name="payment_method" value="CASH" checked>
+                    <span class="pay-icon">💵</span>
+                    Cash
+                </label>
+
+                <label class="payment-option">
+                    <input type="radio" name="payment_method" value="COD">
+                    <span class="pay-icon">🛵</span>
+                    Cash on Delivery
+                </label>
+            </div>
+
+            <button type="submit" class="btn btn-success btn-lg btn-block mt-4">
+                ✓ Confirm Payment
+            </button>
+        </form>
+    </div>
+
+    <a href="{% url 'orders:order_detail' order.id %}" class="btn btn-outline btn-block mt-3">
+        ← Back to order
+    </a>
+
+</div>
+
+{% endblock %}

@@ -1,0 +1,50 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+dist/
+build/
+*.egg
+
+# Virtual environment
+restaurantenv/
+venv/
+.venv/
+
+# Environment secrets
+.env
+
+# Database
+*.sqlite3
+*.sqlite3-journal
+
+# Django
+staticfiles/
+media/
+
+# Node
+node_modules/
+.expo/
+dist/
+*.hbc
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Tool metadata
+.freebuff/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Expo/EAS
+eas.json
+
+# Logs
+*.log
+npm-debug.log*

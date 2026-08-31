@@ -1,0 +1,56 @@
+# Secrets — never bake .env into the image.
+.env
+
+# Python bytecode cache
+__pycache__/
+*.pyc
+*.pyo
+
+# Local virtual environment (if accidentally present)
+restaurantenv/
+venv/
+.venv/
+
+# Local SQLite database
+db.sqlite3
+
+# Generated static files (rebuilt inside the image by collectstatic)
+staticfiles/
+
+# User-uploaded media (ephemeral; use object storage in production)
+media/
+
+# IDE / editor files
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Git
+.git/
+.gitignore
+
+# Documentation / non-runtime files
+PROJECT_DOCUMENTATION.md
+*.md
+
+# Mobile app source (not needed in the backend image)
+mobile/
+
+# Docker artifacts (avoid recursive copy)
+Dockerfile
+.dockerignore
+
+# Render native-deploy files (not used in Docker path)
+build.sh
+Procfile
+
+# Test / debug scripts
+create_test_staff.py
+seed_categories.py
+test_order_payload.py
+verify_qr_image.py
+runserver-tmp.*
+
+# Demo data
+demo/

@@ -1,0 +1,229 @@
+{% extends "base.html" %}
+
+{% block title %}
+Kitchen
+{% endblock %}
+
+{% block content %}
+
+<div class="page-header">
+    <h1>◉ Kitchen Display</h1>
+    <p>New orders arrive here automatically. Start cooking, then mark ready.</p>
+    <div class="header-chips">
+        <span class="header-chip">📋 {{ batches|length }} active batch(es)</span>
+        <span class="status-chip st-occupied">Live updates on</span>
+    </div>
+</div>
+
+<input type="hidden" id="csrf" value="{% csrf_token %}" />
+
+<div id="kitchen-orders" class="kitchen-board mt-3">
+
+{% for batch in batches %}
+
+    <div id="batch-{{ batch.id }}" class="ticket" data-status="{{ batch.status }}">
+
+        <div class="ticket-header">
+            <h2>Order #{{ batch.order.order_number }}</h2>
+            {% if batch.order.order_type == "DELIVERY" %}
+                <span class="ticket-location" style="background:#fff7ed;color:#c2410c;">
+                    🛵 Delivery
+                    {% if batch.order.delivery %}
+                        · {{ batch.order.delivery.customer_name }}
+                        ({{ batch.order.delivery.customer_phone }})
+                    {% endif %}
+                </span>
+            {% elif batch.order.table %}
+                <span class="ticket-location">Table {{ batch.order.table.number }}</span>
+            {% elif batch.order.cabin %}
+                <span class="ticket-location">Cabin {{ batch.order.cabin.number }}</span>
+            {% endif %}
+        </div>
+
+        <div class="ticket-body">
+            <p class="seat-meta">Batch #{{ batch.batch_number }} ·
+                <strong>{{ batch.get_status_display }}</strong>
+            </p>
+
+            <hr class="divider">
+
+            {% for item in batch.items.all %}
+                <div class="ticket-item">
+                    <span>{{ item.menu_item.name }}</span>
+                    <span class="qty">× {{ item.quantity }}</span>
+                </div>
+                {% if item.notes %}
+                    <p class="ticket-note">Note: {{ item.notes }}</p>
+                {% endif %}
+            {% endfor %}
+        </div>
+
+        <div class="ticket-footer batch-actions" data-batch="{{ batch.id }}">
+
+            {% if batch.status == "PENDING" %}
+
+                <form method="post" action="{% url 'kitchen:start_batch' batch.id %}">
+                    {% csrf_token %}
+                    <button type="submit" class="btn btn-primary">
+                        ▶ Start Cooking
+                    </button>
+                </form>
+
+            {% elif batch.status == "PREPARING" %}
+
+                <form method="post" action="{% url 'kitchen:ready_batch' batch.id %}">
+                    {% csrf_token %}
+                    <button type="submit" class="btn btn-success">
+                        ✓ Mark Ready
+                    </button>
+                </form>
+
+            {% endif %}
+
+        </div>
+
+    </div>
+
+{% empty %}
+
+    <div class="empty-state" id="no-orders" style="grid-column: 1 / -1;">
+        <div class="empty-icon">🍳</div>
+        <h3>No pending orders</h3>
+        <p>New orders will appear here automatically.</p>
+    </div>
+
+{% endfor %}
+
+</div>
+
+<script>
+    const csrf = document.getElementById("csrf").value;
+    const container = document.getElementById("kitchen-orders");
+    const protocol = location.protocol === "https:" ? "wss://" : "ws://";
+    const socket = new WebSocket(protocol + location.host + "/ws/kitchen/");
+
+    const statusLabels = {
+        PENDING: "Pending",
+        PREPARING: "Preparing",
+        READY: "Ready",
+        COMPLETED: "Completed"
+    };
+
+    socket.onopen = () => console.log("Kitchen connected");
+    socket.onclose = () => console.log("Kitchen disconnected");
+
+    socket.onmessage = (event) => {
+        const data = JSON.parse(event.data);
+
+        if (data.type === "new_order") {
+            addOrderCard(data);
+        } else if (data.type === "batch_status") {
+            updateBatchStatus(data.batch_id, data.status);
+        }
+    };
+
+    function addOrderCard(data) {
+        if (document.getElementById("batch-" + data.batch_id)) {
+            return;
+        }
+
+        const empty = document.getElementById("no-orders");
+        if (empty) {
+            empty.remove();
+        }
+
+        let locationHtml = "";
+        if (data.order_type === "DELIVERY") {
+            const who = data.delivery
+                ? ` · ${data.delivery.customer_name} (${data.delivery.customer_phone})`
+                : "";
+            locationHtml =
+                `<span class="ticket-location" style="background:#fff7ed;color:#c2410c;">` +
+                `🛵 Delivery${who}</span>`;
+        } else if (data.table) {
+            locationHtml = `<span class="ticket-location">Table ${data.table}</span>`;
+        } else if (data.cabin) {
+            locationHtml = `<span class="ticket-location">Cabin ${data.cabin}</span>`;
+        }
+
+        let itemsHtml = "";
+        data.items.forEach((item) => {
+            const notesHtml = item.notes
+                ? `<p class="ticket-note">Note: ${item.notes}</p>` : "";
+            itemsHtml += `
+                <div class="ticket-item">
+                    <span>${item.name}</span>
+                    <span class="qty">× ${item.quantity}</span>
+                </div>${notesHtml}`;
+        });
+
+        const card = document.createElement("div");
+        card.id = "batch-" + data.batch_id;
+        card.className = "ticket";
+        card.setAttribute("data-status", "PENDING");
+
+        card.innerHTML = `
+            <div class="ticket-header">
+                <h2>Order #${data.order_number}</h2>
+                ${locationHtml}
+            </div>
+            <div class="ticket-body">
+                <p class="seat-meta">Batch #${data.batch_number} ·
+                    <strong>Pending</strong>
+                </p>
+                <hr class="divider">
+                ${itemsHtml}
+            </div>
+            <div class="ticket-footer batch-actions" data-batch="${data.batch_id}">
+                <form method="post" action="/kitchen/batch/${data.batch_id}/start/">
+                    <input type="hidden" name="csrfmiddlewaretoken" value="${csrf}">
+                    <button type="submit" class="btn btn-primary">▶ Start Cooking</button>
+                </form>
+            </div>
+        `;
+
+        container.prepend(card);
+    }
+
+    function updateBatchStatus(batchId, status) {
+        const card = document.getElementById("batch-" + batchId);
+        if (!card) {
+            return;
+        }
+
+        if (status === "READY") {
+            card.remove();
+            if (!container.querySelector(".ticket")) {
+                container.innerHTML =
+                    '<div class="empty-state" id="no-orders" style="grid-column: 1 / -1;">' +
+                    '<div class="empty-icon">🍳</div>' +
+                    "<h3>No pending orders</h3>" +
+                    "<p>New orders will appear here automatically.</p></div>";
+            }
+            return;
+        }
+
+        card.setAttribute("data-status", status);
+
+        const statusEl = card.querySelector(".seat-meta");
+        if (statusEl) {
+            statusEl.innerHTML =
+                statusEl.innerHTML.split("·")[0] + "· <strong>" +
+                (statusLabels[status] || status) + "</strong>";
+        }
+
+        if (status === "PREPARING") {
+            const actions = card.querySelector(".batch-actions");
+            if (actions) {
+                actions.innerHTML = `
+                    <form method="post" action="/kitchen/batch/${batchId}/ready/">
+                        <input type="hidden" name="csrfmiddlewaretoken" value="${csrf}">
+                        <button type="submit" class="btn btn-success">✓ Mark Ready</button>
+                    </form>
+                `;
+            }
+        }
+    }
+</script>
+
+{% endblock %}

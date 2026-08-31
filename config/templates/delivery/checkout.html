@@ -1,0 +1,79 @@
+{% extends "base.html" %}
+
+{% block title %}Checkout{% endblock %}
+{% block page_title %}Checkout{% endblock %}
+
+{% block content %}
+
+<div class="page-header">
+    <h1>✓ Checkout</h1>
+    <p>Confirm your delivery details — payment is Cash on Delivery.</p>
+</div>
+
+{% if error %}
+<div class="alert alert-danger">{{ error }}</div>
+{% endif %}
+
+<div style="display:grid; gap:20px; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));">
+
+    <div class="card">
+        <h3 class="card-title">📦 Your order</h3>
+        {% for line in lines %}
+        <div class="detail-line">
+            <span>{{ line.item.name }} × {{ line.qty }}</span>
+            <span>Rs. {{ line.line_total }}</span>
+        </div>
+        {% endfor %}
+        <div class="detail-line"><span>Delivery fee</span><span>Rs. 100</span></div>
+        <div class="detail-line total"><span>Total</span><span>Rs. {{ subtotal|add:100 }}</span></div>
+    </div>
+
+    <div class="card">
+        <h3 class="card-title">🛵 Delivery details</h3>
+
+        <form method="post" novalidate>
+            {% csrf_token %}
+
+            <div class="form-grid" style="grid-template-columns:1fr;">
+                <div class="form-field">
+                    <label for="co-name">Your name</label>
+                    <input id="co-name" type="text" name="customer_name"
+                           value="{{ customer_name }}" required>
+                </div>
+                <div class="form-field">
+                    <label for="co-phone">Phone number</label>
+                    <input id="co-phone" type="text" name="customer_phone"
+                           placeholder="03XX-XXXXXXX" required>
+                </div>
+                <div class="form-field">
+                    <label for="co-address">Delivery address</label>
+                    <textarea id="co-address" name="address" rows="2"
+                              placeholder="House / street / area" required></textarea>
+                </div>
+                <div class="form-field">
+                    <label for="co-landmark">Landmark (optional)</label>
+                    <input id="co-landmark" type="text" name="landmark"
+                           placeholder="Near…">
+                </div>
+            </div>
+
+            <h3 class="mt-3">Payment method</h3>
+            <label class="payment-option checked mt-1">
+                <input type="radio" name="payment_method" value="COD" checked>
+                <span class="pay-icon">💵</span>
+                Cash on Delivery
+            </label>
+
+            <button type="submit" class="btn btn-success btn-lg btn-block mt-4">
+                ✓ Place Order (Cash on Delivery)
+            </button>
+        </form>
+
+        <a href="{% url 'delivery:cart' %}" class="btn btn-outline btn-block mt-2">
+            ← Back to cart
+        </a>
+    </div>
+
+</div>
+
+{% endblock %}

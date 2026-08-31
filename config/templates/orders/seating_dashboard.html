@@ -1,0 +1,250 @@
+{% extends "base.html" %}
+
+{% block title %}
+Tables & Cabins
+{% endblock %}
+
+{% block content %}
+
+<div class="page-header">
+    <h1>◻ Tables &amp; Cabins</h1>
+    <p>Pick an available seat to start an order, or take payment on an occupied one.</p>
+    <div class="header-chips">
+        <span class="header-chip">🪑 {{ tables|length }} tables</span>
+        <span class="header-chip">🛋 {{ cabins|length }} cabins</span>
+        <span class="header-chip">🟢 {{ tables_available }}/{{ tables|length }} tables free</span>
+    </div>
+</div>
+
+<div class="legend">
+    <span><span class="dot" style="background:var(--color-available)"></span>Available</span>
+    <span><span class="dot" style="background:var(--color-occupied)"></span>Occupied</span>
+    <span><span class="dot" style="background:var(--color-reserved)"></span>Reserved</span>
+</div>
+
+<div class="section-title">🪑 Dining tables</div>
+
+<div class="seat-grid">
+    {% for table in tables %}
+
+    <div class="seat-card {% if table.status == 'OCCUPIED' %}is-occupied{% elif table.status == 'RESERVED' %}is-reserved{% endif %}">
+        <div class="seat-title-row">
+            <div class="seat-icon">🪑</div>
+            <h3>Table {{ table.number }}</h3>
+        </div>
+
+        <p class="seat-meta">
+            Capacity: {{ table.capacity }}
+            <span class="status-chip {% if table.status == 'AVAILABLE' %}st-available{% elif table.status == 'OCCUPIED' %}st-occupied{% else %}st-reserved{% endif %}" style="float:right;">
+                {{ table.get_status_display }}
+            </span>
+        </p>
+
+        {% if table.status == 'AVAILABLE' %}
+        <div class="seat-actions">
+            <a class="btn btn-block" href="{% url 'orders:create_table_order' table.id %}">
+                ＋ Create Order
+            </a>
+        </div>
+
+        {% elif table.open_order %}
+        <p class="seat-order-info">
+            Order #{{ table.open_order.order_number }} —
+            {{ table.open_order.total }} ·
+            {{ table.open_order.get_payment_status_display }}
+        </p>
+        <div class="seat-actions">
+            <a class="btn btn-sm btn-secondary" href="{% url 'orders:order_detail' table.open_order.id %}">
+                View
+            </a>
+            {% if table.open_order.payment_status != 'PAID' %}
+            <form method="post"
+                  action="{% url 'orders:payment' table.open_order.id %}"
+                  style="flex:1;">
+                {% csrf_token %}
+                <input type="hidden" name="payment_method" value="CASH">
+                <button type="submit" class="btn btn-sm btn-success btn-block">
+                    💵 Payment
+                </button>
+            </form>
+            <a class="btn btn-sm btn-outline" href="{% url 'orders:payment' table.open_order.id %}">
+                Method…
+            </a>
+            {% endif %}
+        </div>
+        {% endif %}
+    </div>
+
+{% empty %}
+
+    <p>No tables available.</p>
+
+{% endfor %}
+</div>
+
+
+<div class="section-title">🛋 Private cabins</div>
+
+<div class="seat-grid">
+    {% for cabin in cabins %}
+
+    <div class="seat-card {% if cabin.status == 'OCCUPIED' %}is-occupied{% elif cabin.status == 'RESERVED' %}is-reserved{% endif %}">
+        <div class="seat-title-row">
+            <div class="seat-icon">🛋</div>
+            <h3>Cabin {{ cabin.number }}</h3>
+        </div>
+
+        <p class="seat-meta">
+            Capacity: {{ cabin.capacity }}
+            <span class="status-chip {% if cabin.status == 'AVAILABLE' %}st-available{% elif cabin.status == 'OCCUPIED' %}st-occupied{% else %}st-reserved{% endif %}" style="float:right;">
+                {{ cabin.get_status_display }}
+            </span>
+        </p>
+
+        {% if cabin.status == 'AVAILABLE' %}
+        <div class="seat-actions">
+            <a class="btn btn-block" href="{% url 'orders:create_cabin_order' cabin.id %}">
+                ＋ Create Order
+            </a>
+        </div>
+
+        {% elif cabin.open_order %}
+        <p class="seat-order-info">
+            Order #{{ cabin.open_order.order_number }} —
+            {{ cabin.open_order.total }} ·
+            {{ cabin.open_order.get_payment_status_display }}
+        </p>
+        <div class="seat-actions">
+            <a class="btn btn-sm btn-secondary" href="{% url 'orders:order_detail' cabin.open_order.id %}">
+                View
+            </a>
+            {% if cabin.open_order.payment_status != 'PAID' %}
+            <form method="post"
+                  action="{% url 'orders:payment' cabin.open_order.id %}"
+                  style="flex:1;">
+                {% csrf_token %}
+                <input type="hidden" name="payment_method" value="CASH">
+                <button type="submit" class="btn btn-sm btn-success btn-block">
+                    💵 Payment
+                </button>
+            </form>
+            <a class="btn btn-sm btn-outline" href="{% url 'orders:payment' cabin.open_order.id %}">
+                Method…
+            </a>
+            {% endif %}
+        </div>
+        {% endif %}
+    </div>
+
+    {% empty %}
+
+    <p>No cabins available.</p>
+
+    {% endfor %}
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+    // ── Live "food ready" notifications for waiters ──
+    (function () {
+        var protocol = location.protocol === "https:" ? "wss://" : "ws://";
+        var socket = new WebSocket(protocol + location.host + "/ws/waiters/");
+
+        socket.onmessage = function (event) {
+            var data = JSON.parse(event.data);
+            if (data.type !== "order_ready") return;
+            showReadyToast(data);
+            highlightSeat(data);
+            playChime();
+        };
+
+        function locationText(data) {
+            if (data.delivery) {
+                return "🛵 Delivery — " + data.delivery.customer_name +
+                       " (" + data.delivery.customer_phone + ")";
+            }
+            if (data.table !== null && data.table !== undefined) {
+                return "🪑 Table " + data.table;
+            }
+            if (data.cabin !== null && data.cabin !== undefined) {
+                return "🛋 Cabin " + data.cabin;
+            }
+            return "";
+        }
+
+        function showReadyToast(data) {
+            var container = document.getElementById("ready-toasts");
+            if (!container) {
+                container = document.createElement("div");
+                container.id = "ready-toasts";
+                container.style.cssText =
+                    "position:fixed;top:70px;right:16px;z-index:1200;" +
+                    "display:flex;flex-direction:column;gap:10px;max-width:340px;";
+                document.body.appendChild(container);
+            }
+
+            var toast = document.createElement("div");
+            toast.className = "toast toast-success";
+            toast.style.boxShadow = "var(--shadow-lg)";
+            toast.innerHTML =
+                "<span style='font-size:1.4rem;'>🔔</span>" +
+                "<div style='flex:1;'>" +
+                "<strong>Food is ready!</strong><br>" +
+                "<span style='font-size:0.85rem;'>" + locationText(data) +
+                " · Order #" + data.order_number +
+                (data.ready_at ? " · " + data.ready_at : "") +
+                "</span></div>" +
+                "<button type='button' class='btn btn-sm btn-success' " +
+                "onclick='this.closest(\".toast\").remove()'>✓</button>";
+
+            container.appendChild(toast);
+
+            setTimeout(function () { toast.remove(); }, 20000);
+            while (container.children.length > 5) {
+                container.firstChild.remove();
+            }
+        }
+
+        function highlightSeat(data) {
+            document.querySelectorAll(".seat-card").forEach(function (card) {
+                var text = card.textContent;
+                var match = false;
+                if (data.table !== null && data.table !== undefined) {
+                    match = text.indexOf("Table " + data.table) !== -1;
+                } else if (data.cabin !== null && data.cabin !== undefined) {
+                    match = text.indexOf("Cabin " + data.cabin) !== -1;
+                }
+                if (match) {
+                    card.style.outline = "3px solid #16a34a";
+                    card.style.outlineOffset = "2px";
+                    setTimeout(function () {
+                        card.style.outline = "";
+                        card.style.outlineOffset = "";
+                    }, 30000);
+                }
+            });
+        }
+
+        function playChime() {
+            try {
+                var ctx = new (window.AudioContext || window.webkitAudioContext)();
+                [880, 1174].forEach(function (freq, i) {
+                    var osc = ctx.createOscillator();
+                    var gain = ctx.createGain();
+                    osc.connect(gain);
+                    gain.connect(ctx.destination);
+                    osc.frequency.value = freq;
+                    osc.type = "sine";
+                    gain.gain.setValueAtTime(0.001, ctx.currentTime + i * 0.18);
+                    gain.gain.exponentialRampToValueAtTime(0.25, ctx.currentTime + i * 0.18 + 0.02);
+                    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + i * 0.18 + 0.4);
+                    osc.start(ctx.currentTime + i * 0.18);
+                    osc.stop(ctx.currentTime + i * 0.18 + 0.45);
+                });
+            } catch (e) { /* audio not available */ }
+        }
+    })();
+</script>
+{% endblock %}

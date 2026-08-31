@@ -1,0 +1,73 @@
+{% extends "base.html" %}
+
+{% block title %}
+Order #{{ order.order_number }}
+{% endblock %}
+
+{% block content %}
+
+<div class="page-header">
+    <h1>🧾 Order #{{ order.order_number }}</h1>
+    <p>
+        {% if order.table %}Table {{ order.table.number }}{% endif %}
+        {% if order.cabin %}Cabin {{ order.cabin.number }}{% endif %}
+        · {{ order.get_order_type_display }} ·
+        <span class="status-chip {% if order.payment_status == 'PAID' %}st-paid{% else %}st-unpaid{% endif %}">
+            {{ order.get_payment_status_display }}
+        </span>
+    </p>
+</div>
+
+<div class="row mb-3">
+    <a href="{% url 'orders:add_items' order.id %}" class="btn">＋ Add More Food</a>
+    {% if order.payment_status == "UNPAID" %}
+    <a href="{% url 'orders:payment' order.id %}" class="btn btn-success">💵 Proceed to Payment</a>
+    {% endif %}
+</div>
+
+<h2>Order Items</h2>
+
+<div class="stack mt-2">
+{% for batch in order.batches.all %}
+
+    <div class="card">
+        <h3 class="card-title">📦 Batch {{ batch.batch_number }}
+            <span class="status-chip st-neutral" style="float:right;">{{ batch.get_status_display }}</span>
+        </h3>
+
+        {% for item in batch.items.all %}
+            <div class="detail-line">
+                <span>{{ item.menu_item.name }} × {{ item.quantity }}</span>
+                <span>Rs. {{ item.line_total }}</span>
+            </div>
+        {% empty %}
+            <p class="text-muted">No items in this batch.</p>
+        {% endfor %}
+    </div>
+
+{% empty %}
+
+    <div class="empty-state">
+        <div class="empty-icon">🍽</div>
+        <h3>No items yet</h3>
+        <p>Add food to this order to see it here.</p>
+    </div>
+
+{% endfor %}
+</div>
+
+<div class="totals-card">
+    <div style="flex:1;">
+        <div class="detail-line"><span>Subtotal</span><span>Rs. {{ order.subtotal }}</span></div>
+        <div class="detail-line total"><span>Total</span><span>Rs. {{ order.total }}</span></div>
+    </div>
+    <div>
+        {% if order.payment_status == "UNPAID" %}
+        <a href="{% url 'orders:payment' order.id %}" class="btn btn-success btn-lg">💵 Confirm Payment</a>
+        {% else %}
+        <span class="status-chip st-paid" style="font-size:0.95rem;padding:8px 18px;">✓ PAID</span>
+        {% endif %}
+    </div>
+</div>
+
+{% endblock %}
