@@ -313,6 +313,13 @@ def complete_payment(
         ]
     )
 
+    # Clear any live "food ready" alerts for this order on waiter dashboards.
+    from kitchen.services import notify_waiters_served
+    try:
+        notify_waiters_served(order)
+    except Exception:
+        pass
+
     # --------------------------------------------------------
     # RELEASE TABLE
     # --------------------------------------------------------
@@ -389,6 +396,32 @@ def can_transition(current, new):
     return new in VALID_ORDER_TRANSITIONS.get(current, [])
 
 
+def notify_waiters_served(order):
+    """Tell waiter dashboards an order has been served so any live
+    'food ready' banners for it are removed. Also dismisses any
+    persisted ORDER_READY notifications for the order."""
+    from asgiref.sync import async_to_sync
+    from channels.layers import get_channel_layer
+    from core.models import Notification
+
+    Notification.objects.filter(
+        order=order,
+        dismissed=False,
+    ).update(dismissed=True, dismissed_at=timezone.now())
+
+    channel_layer = get_channel_layer()
+    if channel_layer is None:
+        return
+
+    async_to_sync(channel_layer.group_send)(
+        "waiters",
+        {
+            "type": "order_served",
+            "order_number": order.order_number,
+        },
+    )
+
+
 def transition_order_status(order, new_status):
     """Advance an order's status, rejecting invalid transitions."""
     if order.payment_status == Order.PaymentStatus.PAID and \
@@ -415,6 +448,16 @@ def transition_order_status(order, new_status):
 
     order.status = new_status
     order.save(update_fields=["status"])
+
+    # Once food has been served/completed, clear any live "food ready"
+    # alerts for this order on waiter dashboards.
+    if new_status in (Order.Status.SERVED, Order.Status.COMPLETED):
+        from kitchen.services import notify_waiters_served
+        try:
+            notify_waiters_served(order)
+        except Exception:
+            pass
+
     return order
 
 
@@ -543,6 +586,13 @@ def cancel_order(order, user=None):
 
     release_table(order.table)
     release_cabin(order.cabin)
+
+    # Clear any live "food ready" alerts for this order on waiter dashboards.
+    from kitchen.services import notify_waiters_served
+    try:
+        notify_waiters_served(order)
+    except Exception:
+        pass
 
     from core.services import log_action
     log_action(

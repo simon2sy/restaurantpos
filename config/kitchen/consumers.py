@@ -85,6 +85,16 @@ class WaiterConsumer(AsyncWebsocketConsumer):
         )
 
 
+    async def order_served(self, event):
+
+        await self.send(
+            text_data=json.dumps({
+                "type": "order_served",
+                "order_number": event["order_number"],
+            })
+        )
+
+
 class DashboardConsumer(AsyncWebsocketConsumer):
     """Pushes 'stats_updated' pings to admin dashboards whenever
     orders / payments / expenses change, so the UI can refetch live."""

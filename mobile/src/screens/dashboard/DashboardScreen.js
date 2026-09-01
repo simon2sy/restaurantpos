@@ -13,6 +13,8 @@ import ErrorView from '../../components/ErrorView';
 import { toObject } from '../../utils/data';
 import { WS_BASE_URL } from '../../constants/config';
 import useRealtime from '../../hooks/useRealtime';
+import { notificationApi } from '../../services/notificationApi';
+import * as Notifications from 'expo-notifications';
 
 function StatCard({ icon, value, label, color }) {
   return (
@@ -180,13 +182,56 @@ export default function DashboardScreen({ navigation }) {
 
   const others = slides.filter((s) => s.key !== slides[activeSlide].key);
 
-  // Live "food ready" notifications pushed to waiters by the kitchen
+  // Load pending "food ready" notifications from the server so the banner
+  // reflects reality on app start / refresh (not just live events).
+  const fetchReadyOrders = useCallback(async () => {
+    if (!isCashier && !isManager) return;
+    try {
+      const response = await notificationApi.list();
+      const data = response?.data;
+      if (Array.isArray(data)) {
+        setReadyOrders(
+          data.slice(0, 5).map((n) => ({
+            order_number: n.order_number,
+            table: n.table_number,
+            cabin: n.cabin_number,
+            ready_at: n.ready_at ? String(n.ready_at).slice(11, 16) : '',
+            ts: n.id,
+          }))
+        );
+      }
+    } catch (err) {
+      // Non-critical — the banner is live-updated via WebSocket anyway.
+    }
+  }, [isCashier, isManager]);
+
+  useEffect(() => {
+    fetchReadyOrders();
+  }, [fetchReadyOrders]);
+
+  // Live "food ready" notifications pushed to waiters by the kitchen.
+  // An `order_served` event removes the order from the banner.
   useRealtime(`${WS_BASE_URL}/waiters/`, (msg) => {
     if (msg && msg.type === 'order_ready') {
       setReadyOrders((prev) =>
         prev.some((o) => o.order_number === msg.order_number)
           ? prev
           : [{ ...msg, ts: Date.now() }, ...prev].slice(0, 5)
+      );
+      // Play a notification sound — the WebSocket event itself is silent,
+      // so we present a local notification which plays the default chime.
+      Notifications.scheduleNotificationAsync({
+        content: {
+          title: '🔔 Food is ready!',
+          body: `Order #${msg.order_number} is ready to serve`,
+          sound: 'default',
+        },
+        trigger: null,
+      }).catch(() => {});
+    }
+    if (msg && msg.type === 'order_served') {
+      setReadyOrders((prev) =>
+        prev.filter((o) => o.order_number !== msg.order_number)
       );
     }
   });

@@ -50,11 +50,11 @@ def send_push_notification(token, title, body, data=None, sound=True, priority="
         payload["data"] = data
 
     # Expo's "default" sound plays a notification tone.
-    # For custom Android sounds, you'd include "channelId" and "sound" fields,
-    # but Expo Go uses the default sound. In a standalone APK built with
-    # expo-notifications, the sound configured in the notification channel is used.
+    # On Android a notification channel is required for sound to play;
+    # the app registers the "order-ready" channel with sound enabled.
     if sound:
         payload["sound"] = "default"
+        payload["channelId"] = "order-ready"
 
     try:
         response = requests.post(
