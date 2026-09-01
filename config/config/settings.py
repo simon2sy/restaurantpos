@@ -42,6 +42,11 @@ ALLOWED_HOSTS = [
 if not ALLOWED_HOSTS and DEBUG:
     ALLOWED_HOSTS = ["127.0.0.1", "localhost", "testserver"]
 
+# PaaS fallback (Railway/Render testing): allow the platform's default
+# domain so the HTTP healthcheck passes even before the env var is set.
+if not ALLOWED_HOSTS and not DEBUG:
+    ALLOWED_HOSTS = [".railway.app", ".up.railway.app", ".onrender.com"]
+
 
 # Application definition
 
@@ -248,14 +253,21 @@ SECURE_CONTENT_TYPE_NOSNIFF = True
 SECURE_REFERRER_POLICY = "same-origin"
 
 if not DEBUG:
-    # Production-only transport security
+    # Production-only transport security.
+    # ENABLE_SSL_REDIRECT defaults to False so PaaS internal HTTP
+    # healthchecks (which arrive without TLS headers) get a 200 instead
+    # of a 301. Set ENABLE_SSL_REDIRECT=true once a real domain/CDN is
+    # in front of the app.
+    _ssl_redirect = os.getenv("ENABLE_SSL_REDIRECT", "false").strip().lower() in (
+        "1", "true", "yes",
+    )
     SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
-    SESSION_COOKIE_SECURE = True
-    CSRF_COOKIE_SECURE = True
-    SECURE_SSL_REDIRECT = True
-    SECURE_HSTS_SECONDS = 31536000
-    SECURE_HSTS_INCLUDE_SUBDOMAINS = True
-    SECURE_HSTS_PRELOAD = True
+    SESSION_COOKIE_SECURE = _ssl_redirect
+    CSRF_COOKIE_SECURE = _ssl_redirect
+    SECURE_SSL_REDIRECT = _ssl_redirect
+    SECURE_HSTS_SECONDS = 31536000 if _ssl_redirect else 0
+    SECURE_HSTS_INCLUDE_SUBDOMAINS = _ssl_redirect
+    SECURE_HSTS_PRELOAD = _ssl_redirect
 
 # CSRF trusted origins (for reverse-proxy production deployments)
 CSRF_TRUSTED_ORIGINS = [
