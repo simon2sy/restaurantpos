@@ -3,6 +3,7 @@ import {
   View, Text, TouchableOpacity, StyleSheet, Alert, ActivityIndicator,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import * as Notifications from 'expo-notifications';
 import { COLORS, SPACING, RADIUS } from '../../constants/colors';
 import { orderApi } from '../../services/orderApi';
 
@@ -26,6 +27,15 @@ export default function PaymentScreen({ route, navigation }) {
     setProcessing(true);
     try {
       await orderApi.payment(orderId, selectedMethod);
+      // Play the custom payment-done chime
+      Notifications.scheduleNotificationAsync({
+        content: {
+          title: '💵 Payment received',
+          body: `Rs. ${total} collected`,
+          sound: 'payment_done.mp3',
+        },
+        trigger: null,
+      }).catch(() => {});
       Alert.alert('Success', `Payment of Rs. ${total} completed!`, [
         { text: 'OK', onPress: () => navigation.popToTop() },
       ]);

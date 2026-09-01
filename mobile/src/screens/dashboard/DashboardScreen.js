@@ -219,12 +219,14 @@ export default function DashboardScreen({ navigation }) {
           : [{ ...msg, ts: Date.now() }, ...prev].slice(0, 5)
       );
       // Play a notification sound — the WebSocket event itself is silent,
-      // so we present a local notification which plays the default chime.
+      // so we present a local notification on the 'order-ready' channel,
+      // which plays the custom order_ready.mp3 sound on Android.
       Notifications.scheduleNotificationAsync({
         content: {
           title: '🔔 Food is ready!',
           body: `Order #${msg.order_number} is ready to serve`,
-          sound: 'default',
+          sound: 'order_ready.mp3',
+          channelId: 'order-ready',
         },
         trigger: null,
       }).catch(() => {});
