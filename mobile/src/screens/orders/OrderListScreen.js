@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import {
-  View, Text, FlatList, TouchableOpacity, StyleSheet, RefreshControl, Alert,
+  View, Text, FlatList, TouchableOpacity, StyleSheet, RefreshControl, Alert, ScrollView,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -63,11 +63,23 @@ export default function OrderListScreen({ navigation }) {
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState(null);
   const [filter, setFilter] = useState('All');
+  const [dateFilter, setDateFilter] = useState('all'); // 'all' | 'today' | 'yesterday'
+  const [servedFilter, setServedFilter] = useState('all'); // 'all' | 'served' | 'not_served'
+  const [paymentFilter, setPaymentFilter] = useState('all'); // 'all' | 'PAID' | 'UNPAID'
 
   const fetchOrders = useCallback(async () => {
     try {
       const params = {};
       if (filter !== 'All') params.status = filter;
+      if (dateFilter !== 'all') {
+        const d = new Date();
+        if (dateFilter === 'yesterday') d.setDate(d.getDate() - 1);
+        params.date = d.toISOString().slice(0, 10);
+      }
+      if (servedFilter !== 'all') {
+        params.served = servedFilter === 'served' ? 'true' : 'false';
+      }
+      if (paymentFilter !== 'all') params.payment_status = paymentFilter;
       const response = await orderApi.list(params);
       setOrders(toList(response));
     } catch (err) {
@@ -76,7 +88,7 @@ export default function OrderListScreen({ navigation }) {
       setLoading(false);
       setRefreshing(false);
     }
-  }, [filter]);
+  }, [filter, dateFilter, servedFilter, paymentFilter]);
 
   useEffect(() => {
     fetchOrders();
@@ -105,6 +117,57 @@ export default function OrderListScreen({ navigation }) {
             </Text>
           </TouchableOpacity>
         ))}
+      </View>
+
+      {/* Day / Served / Payment filters */}
+      <View style={styles.filterRow}>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 6 }}>
+          {[
+            { id: 'all', label: 'Any day' },
+            { id: 'today', label: 'Today' },
+            { id: 'yesterday', label: 'Yesterday' },
+          ].map((opt) => (
+            <TouchableOpacity
+              key={opt.id}
+              style={[styles.filterPill, dateFilter === opt.id && styles.filterPillActive]}
+              onPress={() => setDateFilter(opt.id)}
+            >
+              <Text style={[styles.filterText, dateFilter === opt.id && styles.filterTextActive]}>
+                📅 {opt.label}
+              </Text>
+            </TouchableOpacity>
+          ))}
+          {[
+            { id: 'all', label: 'Any status' },
+            { id: 'served', label: 'Served' },
+            { id: 'not_served', label: 'Not served' },
+          ].map((opt) => (
+            <TouchableOpacity
+              key={opt.id}
+              style={[styles.filterPill, servedFilter === opt.id && styles.filterPillActive]}
+              onPress={() => setServedFilter(opt.id)}
+            >
+              <Text style={[styles.filterText, servedFilter === opt.id && styles.filterTextActive]}>
+                🍽️ {opt.label}
+              </Text>
+            </TouchableOpacity>
+          ))}
+          {[
+            { id: 'all', label: 'Any payment' },
+            { id: 'PAID', label: 'Paid' },
+            { id: 'UNPAID', label: 'Unpaid' },
+          ].map((opt) => (
+            <TouchableOpacity
+              key={opt.id}
+              style={[styles.filterPill, paymentFilter === opt.id && styles.filterPillActive]}
+              onPress={() => setPaymentFilter(opt.id)}
+            >
+              <Text style={[styles.filterText, paymentFilter === opt.id && styles.filterTextActive]}>
+                💰 {opt.label}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </ScrollView>
       </View>
 
       <FlatList

@@ -8,6 +8,7 @@ import { orderApi } from '../../services/orderApi';
 
 const PAYMENT_METHODS = [
   { id: 'CASH', label: 'Cash', icon: 'cash', color: COLORS.success },
+  { id: 'ONLINE', label: 'Online', icon: 'globe', color: COLORS.primary },
   { id: 'COD', label: 'Cash on Delivery', icon: 'bicycle', color: COLORS.info },
 ];
 

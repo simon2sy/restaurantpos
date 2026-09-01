@@ -314,7 +314,7 @@ def complete_payment(
     )
 
     # Clear any live "food ready" alerts for this order on waiter dashboards.
-    from kitchen.services import notify_waiters_served
+    # notify_waiters_served is defined below in this module.
     try:
         notify_waiters_served(order)
     except Exception:

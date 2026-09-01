@@ -266,4 +266,6 @@ class AddItemsToOrderSerializer(serializers.Serializer):
 class PaymentSerializer(serializers.Serializer):
     """Complete payment for an order."""
 
-    payment_method = serializers.ChoiceField(choices=[("CASH", "Cash"), ("COD", "Cash on Delivery")])
+    payment_method = serializers.ChoiceField(
+        choices=[("CASH", "Cash"), ("COD", "Cash on Delivery"), ("ONLINE", "Online")]
+    )

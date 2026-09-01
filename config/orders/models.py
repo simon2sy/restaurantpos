@@ -7,6 +7,7 @@ from core.models import TimeStampedModel
 class PaymentMethod(models.TextChoices):
     CASH = "CASH", "Cash"
     COD = "COD", "Cash on Delivery"
+    ONLINE = "ONLINE", "Online"
 
 
 class Table(TimeStampedModel):

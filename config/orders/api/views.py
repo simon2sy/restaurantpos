@@ -212,6 +212,33 @@ class OrderListCreateView(generics.ListCreateAPIView):
         if payment_status:
             qs = qs.filter(payment_status=payment_status)
 
+        # Filter by served state: served=true -> SERVED/COMPLETED,
+        # served=false -> everything not yet served
+        served = self.request.query_params.get("served")
+        if served == "true":
+            qs = qs.filter(
+                status__in=[Order.Status.SERVED, Order.Status.COMPLETED]
+            )
+        elif served == "false":
+            qs = qs.exclude(
+                status__in=[Order.Status.SERVED, Order.Status.COMPLETED]
+            )
+
+        # Filter by day: ?date=YYYY-MM-DD (orders created that day)
+        date_str = self.request.query_params.get("date")
+        if date_str:
+            from datetime import datetime, time as dtime
+            try:
+                day = datetime.strptime(date_str, "%Y-%m-%d").date()
+            except ValueError:
+                raise DRFValidationError(
+                    {"date": "Invalid date. Use YYYY-MM-DD."}
+                )
+            from django.utils import timezone as tz
+            start = tz.make_aware(dtime.combine(day, dtime.min))
+            end = tz.make_aware(dtime.combine(day, dtime.max))
+            qs = qs.filter(created_at__range=(start, end))
+
         return qs
 
     def create(self, request, *args, **kwargs):
