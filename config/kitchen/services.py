@@ -107,6 +107,7 @@ def notify_waiters_ready(batch):
             "waiters",
             {
                 "type": "order_ready",
+                "order_id": order.id,
                 "order_number": order.order_number,
                 "table": table_num,
                 "cabin": cabin_num,

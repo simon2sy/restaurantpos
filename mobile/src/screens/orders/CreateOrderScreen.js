@@ -108,8 +108,15 @@ export default function CreateOrderScreen({ route, navigation }) {
         {
           text: 'View Order',
           onPress: () => {
-            navigation.popToTop();
-            navigation.push('OrderDetail', { orderId });
+            // reset() is atomic — popToTop()+push() can race in the native
+            // stack navigator and leave a broken back stack.
+            navigation.reset({
+              index: 1,
+              routes: [
+                { name: 'OrderList' },
+                { name: 'OrderDetail', params: { orderId } },
+              ],
+            });
           },
         },
         { text: 'New Another', style: 'cancel' },

@@ -286,9 +286,17 @@ if REDIS_URL:
             "LOCATION": REDIS_URL,
             "OPTIONS": {
                 "CLIENT_CLASS": "django_redis.client.DefaultClient",
+                # Degrade gracefully instead of 500-ing when Redis blips
+                # (Render free Redis evicts/restarts). A failed cache read
+                # is treated as a miss; throttles/lockouts keep working
+                # best-effort rather than killing the request.
+                "IGNORE_EXCEPTIONS": True,
+                "SOCKET_CONNECT_TIMEOUT": 3,
+                "SOCKET_TIMEOUT": 3,
             },
         }
     }
+    DJANGO_REDIS_LOG_IGNORED_EXCEPTIONS = True
 
 MAILERS = {
     'default': {

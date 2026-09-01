@@ -29,7 +29,7 @@ function SeatCard({ seat, type, onPress, onPay }) {
       </View>
 
       {isAvailable ? (
-        <TouchableOpacity style={styles.createButton} onPress={() => onPress(seat)}>
+        <TouchableOpacity style={styles.createButton} onPress={() => onPress(seat, type)}>
           <Ionicons name="add-circle" size={20} color="#fff" />
           <Text style={styles.createButtonText}>Create Order</Text>
         </TouchableOpacity>
@@ -91,8 +91,9 @@ export default function SeatingScreen({ navigation }) {
     fetchSeating();
   };
 
-  const handleCreateOrder = (seat) => {
-    navigation.navigate('CreateOrder', { type: seat.number > 100 ? 'cabin' : 'table', seatId: seat.id });
+  const handleCreateOrder = (seat, type) => {
+    // Use the actual seat type from the card, not a number-based guess.
+    navigation.navigate('CreateOrder', { type: type.toLowerCase(), seatId: seat.id });
   };
 
   const handleAction = (action, orderId) => {

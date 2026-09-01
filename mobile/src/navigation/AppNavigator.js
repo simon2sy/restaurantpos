@@ -10,6 +10,10 @@ import { COLORS } from '../constants/colors';
 
 const Stack = createNativeStackNavigator();
 
+// Global ref so code outside the NavigationContainer (e.g. push
+// notification tap handlers) can navigate.
+export const navigationRef = React.createRef();
+
 export default function AppNavigator() {
   const { isLoggedIn, loading } = useAuth();
 
@@ -22,7 +26,7 @@ export default function AppNavigator() {
   }
 
   return (
-    <NavigationContainer>
+    <NavigationContainer ref={navigationRef}>
       <Stack.Navigator screenOptions={{ headerShown: false }}>
         {isLoggedIn ? (
           <Stack.Screen name="Main" component={MainNavigator} />

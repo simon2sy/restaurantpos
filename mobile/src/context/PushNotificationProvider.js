@@ -1,6 +1,6 @@
 import React, { createContext, useContext } from 'react';
-import { Alert } from 'react-native';
 import usePushNotifications from '../hooks/usePushNotifications';
+import { navigationRef } from '../navigation/AppNavigator';
 
 const PushNotificationContext = createContext({ pushToken: null });
 
@@ -10,7 +10,7 @@ export const usePushNotificationContext = () => useContext(PushNotificationConte
  * Wraps the app and manages push notification registration + listeners.
  *
  * When a notification arrives in the foreground, it shows an in-app alert.
- * When the user taps a notification, the data payload is available for navigation.
+ * When the user taps a notification, the app deep-links to the related order.
  */
 export function PushNotificationProvider({ children }) {
   const { pushToken } = usePushNotifications({
@@ -20,9 +20,15 @@ export function PushNotificationProvider({ children }) {
       // (The notification banner already shows via setNotificationHandler)
     },
     onNotificationTap: (data) => {
-      // Handle notification tap — navigate based on data payload
-      // e.g. if data.type === 'order_ready', navigate to kitchen screen
-      console.log('Notification tapped:', data);
+      // Deep-link to the order the notification is about. The backend
+      // sends { type: 'order_ready', order_id, order_number, batch_id }.
+      const orderId = Number(data?.order_id);
+      if (orderId && navigationRef.current?.isReady()) {
+        navigationRef.current.navigate('Main', {
+          screen: 'Orders',
+          params: { screen: 'OrderDetail', params: { orderId } },
+        });
+      }
     },
   });
 

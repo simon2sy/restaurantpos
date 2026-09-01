@@ -118,7 +118,7 @@ export default function DashboardScreen({ navigation }) {
     fetchData(p);
   };
 
-  const periodLabel = { today: 'Today', '7': 'Week', month: 'Month' }[period];
+  const periodLabel = { today: 'Today', '7': 'Week', '30': '30 Days' }[period];
   const greeting = getGreeting();
   const revenue = summary?.total_revenue ?? stats?.revenue_today ?? 0;
   const ordersCount = summary?.total_orders ?? stats?.orders_today ?? 0;
@@ -227,6 +227,11 @@ export default function DashboardScreen({ navigation }) {
           body: `Order #${msg.order_number} is ready to serve`,
           sound: 'order_ready.mp3',
           channelId: 'order-ready',
+          data: {
+            type: 'order_ready',
+            order_id: msg.order_id,
+            order_number: msg.order_number,
+          },
         },
         trigger: null,
       }).catch(() => {});
@@ -279,7 +284,7 @@ export default function DashboardScreen({ navigation }) {
         {[
           { key: 'today', label: 'Today' },
           { key: '7', label: 'Week' },
-          { key: 'month', label: 'Month' },
+          { key: '30', label: '30 Days' },
         ].map((p) => (
           <TouchableOpacity
             key={p.key}
@@ -407,7 +412,7 @@ export default function DashboardScreen({ navigation }) {
             title="View Orders"
             subtitle="See all current orders"
             color={COLORS.success}
-            onPress={() => navigation.navigate('Orders')}
+            onPress={() => navigation.navigate('Orders', { screen: 'OrderList' })}
           />
         </View>
       )}
