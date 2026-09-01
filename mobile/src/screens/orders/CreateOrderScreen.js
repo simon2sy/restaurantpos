@@ -109,7 +109,7 @@ export default function CreateOrderScreen({ route, navigation }) {
           text: 'View Order',
           onPress: () => {
             navigation.popToTop();
-            navigation.navigate('OrderDetail', { orderId });
+            navigation.push('OrderDetail', { orderId });
           },
         },
         { text: 'New Another', style: 'cancel' },

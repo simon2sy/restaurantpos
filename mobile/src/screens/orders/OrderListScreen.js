@@ -113,7 +113,7 @@ export default function OrderListScreen({ navigation }) {
         renderItem={({ item }) => (
           <OrderCard
             order={item}
-            onPress={() => navigation.navigate('OrderDetail', { orderId: item.id })}
+            onPress={() => navigation.push('OrderDetail', { orderId: item.id })}
           />
         )}
         contentContainerStyle={[styles.list, { paddingBottom: 100 + insets.bottom }]}

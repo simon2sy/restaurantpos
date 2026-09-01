@@ -39,6 +39,9 @@ export default function OrderDetailScreen({ route, navigation }) {
   }, [orderId]);
 
   useEffect(() => {
+    setLoading(true);
+    setError(null);
+    setOrder(null);
     fetchOrder();
   }, [fetchOrder]);
 

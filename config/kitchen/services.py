@@ -100,31 +100,48 @@ def notify_waiters_ready(batch):
     # --- Real-time push via WebSocket ---
     channel_layer = get_channel_layer()
 
-    if channel_layer is None:
-        return  # notifications are best-effort; never block the kitchen.
+    if channel_layer is not None:
+        async_to_sync(
+            channel_layer.group_send
+        )(
+            "waiters",
+            {
+                "type": "order_ready",
+                "order_number": order.order_number,
+                "table": table_num,
+                "cabin": cabin_num,
+                "delivery": (
+                    {
+                        "customer_name": delivery.customer_name,
+                        "customer_phone": delivery.customer_phone,
+                    }
+                    if delivery
+                    else None
+                ),
+                "ready_at": batch.ready_at.strftime("%H:%M")
+                if batch.ready_at
+                else "",
+            },
+        )
 
-    async_to_sync(
-        channel_layer.group_send
-    )(
-        "waiters",
-        {
-            "type": "order_ready",
-            "order_number": order.order_number,
-            "table": table_num,
-            "cabin": cabin_num,
-            "delivery": (
-                {
-                    "customer_name": delivery.customer_name,
-                    "customer_phone": delivery.customer_phone,
-                }
-                if delivery
-                else None
-            ),
-            "ready_at": batch.ready_at.strftime("%H:%M")
-            if batch.ready_at
-            else "",
-        },
-    )
+    # --- FCM push notification to all waiters (best-effort) ---
+    try:
+        from core.push import send_push_to_role
+        send_push_to_role(
+            role="WAITER",
+            title="🍽️ Order Ready!",
+            body=message,
+            data={
+                "type": "order_ready",
+                "order_id": order.id,
+                "order_number": order.order_number,
+                "batch_id": batch.id,
+            },
+            sound=True,
+        )
+    except Exception:
+        # Push notifications are best-effort; never block kitchen workflow.
+        pass
 
 
 def complete_batch(batch):

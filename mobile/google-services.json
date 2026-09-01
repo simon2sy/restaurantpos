@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "660852873737",
+    "project_id": "restaurantpos-a8570",
+    "storage_bucket": "restaurantpos-a8570.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:660852873737:android:24540dd1461818d22d76d8",
+        "android_client_info": {
+          "package_name": "com.restaurant.pos"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCzz-76NiB-T7fxSPED1qT5TY-ES3calks"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

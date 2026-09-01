@@ -36,7 +36,7 @@ class LoginView(APIView):
     """
 
     permission_classes = [permissions.AllowAny]
-    throttle_classes = []  # Use custom throttle
+    throttle_classes = ["rest_framework.throttling.AnonRateThrottle"]
 
     def post(self, request):
         from django.core.cache import cache
@@ -226,6 +226,7 @@ class CustomerRegisterAPIView(APIView):
     """POST /api/v1/auth/register/ — Public customer registration."""
 
     permission_classes = [permissions.AllowAny]
+    throttle_classes = ["rest_framework.throttling.AnonRateThrottle"]
 
     def post(self, request):
         serializer = CustomerRegisterSerializer(data=request.data)
@@ -491,6 +492,7 @@ class QRLoginAPIView(APIView):
     """
 
     permission_classes = [permissions.AllowAny]
+    throttle_classes = ["rest_framework.throttling.AnonRateThrottle"]
 
     def post(self, request):
         from django.core.cache import cache

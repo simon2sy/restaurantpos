@@ -97,9 +97,9 @@ export default function SeatingScreen({ navigation }) {
 
   const handleAction = (action, orderId) => {
     if (action === 'view') {
-      navigation.navigate('OrderDetail', { orderId });
+      navigation.push('OrderDetail', { orderId });
     } else if (action === 'payment') {
-      navigation.navigate('OrderDetail', { orderId });
+      navigation.push('OrderDetail', { orderId });
     }
   };
 

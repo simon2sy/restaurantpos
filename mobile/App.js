@@ -5,7 +5,10 @@ import { useFonts } from 'expo-font';
 import * as SplashScreen from 'expo-splash-screen';
 import { Ionicons } from '@expo/vector-icons';
 import { AuthProvider } from './src/context/AuthContext';
+import { NetworkProvider } from './src/context/NetworkProvider';
 import AppNavigator from './src/navigation/AppNavigator';
+import ErrorBoundary from './src/components/ErrorBoundary';
+import { PushNotificationProvider } from './src/context/PushNotificationProvider';
 
 // Keep splash screen visible while fonts load
 SplashScreen.preventAutoHideAsync();
@@ -34,11 +37,17 @@ export default function App() {
   }
 
   return (
-    <SafeAreaProvider onLayout={onLayoutRootView}>
-      <AuthProvider>
-        <StatusBar style="light" />
-        <AppNavigator />
-      </AuthProvider>
-    </SafeAreaProvider>
+    <ErrorBoundary>
+      <NetworkProvider>
+        <SafeAreaProvider onLayout={onLayoutRootView}>
+          <AuthProvider>
+            <PushNotificationProvider>
+              <StatusBar style="light" />
+              <AppNavigator />
+            </PushNotificationProvider>
+          </AuthProvider>
+        </SafeAreaProvider>
+      </NetworkProvider>
+    </ErrorBoundary>
   );
 }

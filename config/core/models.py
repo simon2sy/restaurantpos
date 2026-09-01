@@ -143,3 +143,40 @@ class Notification(TimeStampedModel):
         self.save(update_fields=["dismissed", "dismissed_at"])
 
 
+class DeviceToken(TimeStampedModel):
+    """Stores FCM/APNs push-notification device tokens.
+
+    Each mobile device registers its Expo push token (or native FCM token)
+    against the authenticated user so the backend can send targeted push
+    notifications (e.g. order-ready alerts to waiters).
+    """
+
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="device_tokens",
+    )
+    token = models.CharField(
+        max_length=512,
+        unique=True,
+        db_index=True,
+        help_text="Expo push token or native FCM token.",
+    )
+    platform = models.CharField(
+        max_length=20,
+        choices=[("android", "Android"), ("ios", "iOS"), ("web", "Web")],
+        default="android",
+    )
+    is_active = models.BooleanField(default=True, db_index=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+
+    def __str__(self):
+        return f"{self.user.username} — {self.platform} ({self.token[:20]}...)"
+
+    def deactivate(self):
+        self.is_active = False
+        self.save(update_fields=["is_active"])
+
+

@@ -11,4 +11,12 @@ export const notificationApi = {
 
   /** Dismiss every pending notification at once. */
   dismissAll: () => api.post(`${PREFIX}/dismiss-all/`),
+
+  /** Register a push notification device token. */
+  registerDeviceToken: (token, platform = 'android') =>
+    api.post(`${PREFIX}/device-token/`, { token, platform }),
+
+  /** Unregister a push notification device token (on logout). */
+  unregisterDeviceToken: (token) =>
+    api.delete(`${PREFIX}/device-token/delete/`, { token }),
 };
