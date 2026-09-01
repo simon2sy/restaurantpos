@@ -1,0 +1,41 @@
+[
+  {
+    "id": "30220af1-e7d6-40d6-9227-85a4209dee53",
+    "status": "IN_PROGRESS",
+    "platform": "ANDROID",
+    "artifacts": {},
+    "fingerprint": {
+      "id": "01a05aab-3f3c-7afe-b395-fab56a5cf7a6",
+      "hash": "77cd16422d4b6f1b23e6f0b457e1f182f07ed829"
+    },
+    "initiatingActor": {
+      "id": "3fc8b0b2-ffc5-4c00-bf5f-d3f21af6039c",
+      "displayName": "simon191030"
+    },
+    "logFiles": [
+      "https://storage.googleapis.com/eas-workflows-production/logs/ffdb4522-486b-4552-8e26-99d3fc96e01e/30220af1-e7d6-40d6-9227-85a4209dee53/2026-09-01T01%3A52%3A52Z-fbb69a32-2f0a-40cd-ba20-80db39caf6cb.txt?X-Goog-Algorithm=GOOG4-RSA-SHA256&X-Goog-Credential=www-production%40exponentjs.iam.gserviceaccount.com%2F20260901%2Fauto%2Fstorage%2Fgoog4_request&X-Goog-Date=20260901T015427Z&X-Goog-Expires=900&X-Goog-SignedHeaders=host&X-Goog-Signature=04419720fb1724c09542c5a046f4e191e4350c709f4eca789a253bed352760eea3ab12d4881d51cb90680fa0c30b1d08b7e10b96c09dd216aa85bbce533ece5fa97d64bbbb851792ca1092360c0e91cefa371c38c2e5139f7a462756b0c8a4226f6b190f0655afcee6a792b82c718812486b39a33a7f61bff43dbde9f5bb4abcedc9735afb3242aff3aea0b4a0072fd8d6fc53f04de4eb66622e7fe05ef715c51b098b9605f5b54dfb356e07b54512681ae8a37aa38057eb278d668ffbee92d7371f1cbe12aaabeed603a7ce50f1be2f051594f0ec6720fa306e8cae37bd0777f4e48f49cf6ee7a6dff19dddefd65cc691ee2ac9e1a7354cc61044f78de7cdb9"
+    ],
+    "app": {
+      "id": "ffdb4522-486b-4552-8e26-99d3fc96e01e",
+      "name": "restaurant-pos",
+      "slug": "restaurant-pos",
+      "ownerAccount": {
+        "id": "4bd70887-1c85-48a9-b382-1135bbfd2a8d",
+        "name": "simon191030"
+      }
+    },
+    "distribution": "INTERNAL",
+    "buildProfile": "preview",
+    "appIdentifier": "com.restaurant.pos",
+    "sdkVersion": "52.0.0",
+    "appVersion": "1.0.0",
+    "appBuildVersion": "1",
+    "gitCommitHash": "4b473995902e189fb2ecbe64f2cfd45523942b17",
+    "gitCommitMessage": "Harden mobile API error handling for Render suspension; add Render blueprint for consolidated repo",
+    "priority": "NORMAL",
+    "createdAt": "2026-09-01T01:52:47.280Z",
+    "updatedAt": "2026-09-01T01:52:56.978Z",
+    "expirationDate": "2026-09-15T01:52:47.407Z",
+    "isForIosSimulator": false
+  }
+]

@@ -30,15 +30,7 @@
       "favicon": "./assets/favicon.png"
     },
     "plugins": [
-      "expo-asset",
-      [
-        "expo-font",
-        {
-          "fonts": [
-            "./assets/fonts/Ionicons.ttf"
-          ]
-        }
-      ]
+      "expo-asset"
     ],
     "extra": {
       "eas": {
