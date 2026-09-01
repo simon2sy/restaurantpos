@@ -1,0 +1,341 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<coverage generated="1788241790407" clover="3.2.0">
+  <project timestamp="1788241790407" name="All files">
+    <metrics statements="281" coveredstatements="221" conditionals="181" coveredconditionals="120" methods="55" coveredmethods="39" elements="517" coveredelements="380" complexity="0" loc="281" ncloc="281" packages="7" files="11" classes="11"/>
+    <package name="components">
+      <metrics statements="12" coveredstatements="12" conditionals="8" coveredconditionals="7" methods="6" coveredmethods="6"/>
+      <file name="ErrorBoundary.js" path="E:\Djanog test\Restaurant Pos System\mobile\src\components\ErrorBoundary.js">
+        <metrics statements="10" coveredstatements="10" conditionals="4" coveredconditionals="3" methods="5" coveredmethods="5"/>
+        <line num="11" count="4" type="stmt"/>
+        <line num="12" count="4" type="stmt"/>
+        <line num="16" count="3" type="stmt"/>
+        <line num="20" count="3" type="stmt"/>
+        <line num="23" count="4" type="stmt"/>
+        <line num="24" count="1" type="stmt"/>
+        <line num="28" count="8" type="cond" truecount="2" falsecount="0"/>
+        <line num="29" count="3" type="stmt"/>
+        <line num="44" count="5" type="stmt"/>
+        <line num="48" count="1" type="stmt"/>
+      </file>
+      <file name="NotificationBell.js" path="E:\Djanog test\Restaurant Pos System\mobile\src\components\NotificationBell.js">
+        <metrics statements="2" coveredstatements="2" conditionals="4" coveredconditionals="4" methods="1" coveredmethods="1"/>
+        <line num="6" count="6" type="stmt"/>
+        <line num="18" count="1" type="stmt"/>
+      </file>
+    </package>
+    <package name="constants">
+      <metrics statements="12" coveredstatements="12" conditionals="0" coveredconditionals="0" methods="0" coveredmethods="0"/>
+      <file name="colors.js" path="E:\Djanog test\Restaurant Pos System\mobile\src\constants\colors.js">
+        <metrics statements="4" coveredstatements="4" conditionals="0" coveredconditionals="0" methods="0" coveredmethods="0"/>
+        <line num="2" count="2" type="stmt"/>
+        <line num="54" count="2" type="stmt"/>
+        <line num="62" count="2" type="stmt"/>
+        <line num="71" count="2" type="stmt"/>
+      </file>
+      <file name="config.js" path="E:\Djanog test\Restaurant Pos System\mobile\src\constants\config.js">
+        <metrics statements="8" coveredstatements="8" conditionals="0" coveredconditionals="0" methods="0" coveredmethods="0"/>
+        <line num="6" count="3" type="stmt"/>
+        <line num="11" count="3" type="stmt"/>
+        <line num="12" count="3" type="stmt"/>
+        <line num="15" count="3" type="stmt"/>
+        <line num="18" count="3" type="stmt"/>
+        <line num="19" count="3" type="stmt"/>
+        <line num="22" count="3" type="stmt"/>
+        <line num="25" count="3" type="stmt"/>
+      </file>
+    </package>
+    <package name="context">
+      <metrics statements="78" coveredstatements="50" conditionals="33" coveredconditionals="13" methods="15" coveredmethods="9"/>
+      <file name="AuthContext.js" path="E:\Djanog test\Restaurant Pos System\mobile\src\context\AuthContext.js">
+        <metrics statements="60" coveredstatements="40" conditionals="25" coveredconditionals="12" methods="9" coveredmethods="6"/>
+        <line num="6" count="1" type="stmt"/>
+        <line num="9" count="16" type="stmt"/>
+        <line num="10" count="16" type="stmt"/>
+        <line num="11" count="16" type="stmt"/>
+        <line num="14" count="16" type="stmt"/>
+        <line num="15" count="5" type="stmt"/>
+        <line num="18" count="16" type="stmt"/>
+        <line num="19" count="5" type="stmt"/>
+        <line num="20" count="5" type="stmt"/>
+        <line num="21" count="5" type="cond" truecount="2" falsecount="0"/>
+        <line num="22" count="3" type="stmt"/>
+        <line num="23" count="2" type="cond" truecount="1" falsecount="1"/>
+        <line num="24" count="2" type="stmt"/>
+        <line num="25" count="2" type="stmt"/>
+        <line num="27" count="0" type="stmt"/>
+        <line num="28" count="0" type="stmt"/>
+        <line num="33" count="1" type="stmt"/>
+        <line num="34" count="1" type="stmt"/>
+        <line num="36" count="5" type="stmt"/>
+        <line num="40" count="16" type="stmt"/>
+        <line num="41" count="1" type="stmt"/>
+        <line num="42" count="1" type="cond" truecount="1" falsecount="1"/>
+        <line num="43" count="1" type="stmt"/>
+        <line num="44" count="1" type="stmt"/>
+        <line num="45" count="1" type="stmt"/>
+        <line num="47" count="0" type="cond" truecount="0" falsecount="2"/>
+        <line num="50" count="16" type="stmt"/>
+        <line num="51" count="0" type="stmt"/>
+        <line num="52" count="0" type="cond" truecount="0" falsecount="2"/>
+        <line num="53" count="0" type="stmt"/>
+        <line num="54" count="0" type="stmt"/>
+        <line num="55" count="0" type="stmt"/>
+        <line num="57" count="0" type="cond" truecount="0" falsecount="2"/>
+        <line num="60" count="16" type="stmt"/>
+        <line num="61" count="0" type="stmt"/>
+        <line num="62" count="0" type="stmt"/>
+        <line num="63" count="0" type="stmt"/>
+        <line num="64" count="0" type="stmt"/>
+        <line num="67" count="16" type="stmt"/>
+        <line num="68" count="0" type="stmt"/>
+        <line num="69" count="0" type="cond" truecount="0" falsecount="2"/>
+        <line num="70" count="0" type="stmt"/>
+        <line num="71" count="0" type="stmt"/>
+        <line num="72" count="0" type="stmt"/>
+        <line num="74" count="0" type="cond" truecount="0" falsecount="2"/>
+        <line num="77" count="16" type="stmt"/>
+        <line num="79" count="64" type="cond" truecount="2" falsecount="0"/>
+        <line num="80" count="36" type="cond" truecount="2" falsecount="0"/>
+        <line num="81" count="12" type="stmt"/>
+        <line num="86" count="16" type="stmt"/>
+        <line num="87" count="16" type="stmt"/>
+        <line num="88" count="16" type="stmt"/>
+        <line num="89" count="16" type="stmt"/>
+        <line num="90" count="16" type="cond" truecount="3" falsecount="0"/>
+        <line num="92" count="16" type="stmt"/>
+        <line num="108" count="16" type="stmt"/>
+        <line num="112" count="20" type="stmt"/>
+        <line num="113" count="20" type="cond" truecount="1" falsecount="1"/>
+        <line num="114" count="0" type="stmt"/>
+        <line num="116" count="20" type="stmt"/>
+      </file>
+      <file name="NetworkProvider.js" path="E:\Djanog test\Restaurant Pos System\mobile\src\context\NetworkProvider.js">
+        <metrics statements="18" coveredstatements="10" conditionals="8" coveredconditionals="1" methods="6" coveredmethods="3"/>
+        <line num="5" count="1" type="stmt"/>
+        <line num="7" count="3" type="stmt"/>
+        <line num="14" count="4" type="stmt"/>
+        <line num="15" count="4" type="stmt"/>
+        <line num="16" count="4" type="stmt"/>
+        <line num="18" count="4" type="stmt"/>
+        <line num="19" count="3" type="stmt"/>
+        <line num="20" count="0" type="cond" truecount="0" falsecount="2"/>
+        <line num="21" count="0" type="stmt"/>
+        <line num="23" count="0" type="cond" truecount="0" falsecount="2"/>
+        <line num="24" count="0" type="stmt"/>
+        <line num="25" count="0" type="stmt"/>
+        <line num="30" count="0" type="cond" truecount="0" falsecount="2"/>
+        <line num="31" count="0" type="stmt"/>
+        <line num="35" count="0" type="stmt"/>
+        <line num="39" count="3" type="stmt"/>
+        <line num="42" count="4" type="stmt"/>
+        <line num="56" count="1" type="stmt"/>
+      </file>
+    </package>
+    <package name="hooks">
+      <metrics statements="28" coveredstatements="25" conditionals="11" coveredconditionals="9" methods="5" coveredmethods="4"/>
+      <file name="useRetry.js" path="E:\Djanog test\Restaurant Pos System\mobile\src\hooks\useRetry.js">
+        <metrics statements="28" coveredstatements="25" conditionals="11" coveredconditionals="9" methods="5" coveredmethods="4"/>
+        <line num="17" count="37" type="stmt"/>
+        <line num="18" count="37" type="stmt"/>
+        <line num="19" count="37" type="stmt"/>
+        <line num="20" count="37" type="stmt"/>
+        <line num="22" count="37" type="stmt"/>
+        <line num="24" count="9" type="stmt"/>
+        <line num="25" count="9" type="stmt"/>
+        <line num="26" count="9" type="stmt"/>
+        <line num="29" count="9" type="stmt"/>
+        <line num="30" count="11" type="stmt"/>
+        <line num="31" count="11" type="stmt"/>
+        <line num="32" count="3" type="stmt"/>
+        <line num="33" count="3" type="stmt"/>
+        <line num="34" count="3" type="stmt"/>
+        <line num="36" count="8" type="stmt"/>
+        <line num="40" count="8" type="cond" truecount="2" falsecount="0"/>
+        <line num="43" count="8" type="cond" truecount="4" falsecount="0"/>
+        <line num="46" count="2" type="stmt"/>
+        <line num="47" count="2" type="stmt"/>
+        <line num="51" count="6" type="stmt"/>
+        <line num="52" count="6" type="stmt"/>
+        <line num="53" count="6" type="stmt"/>
+        <line num="58" count="37" type="stmt"/>
+        <line num="59" count="0" type="cond" truecount="0" falsecount="2"/>
+        <line num="60" count="0" type="stmt"/>
+        <line num="62" count="0" type="stmt"/>
+        <line num="65" count="37" type="stmt"/>
+        <line num="67" count="37" type="stmt"/>
+      </file>
+    </package>
+    <package name="screens.auth">
+      <metrics statements="40" coveredstatements="34" conditionals="34" coveredconditionals="27" methods="8" coveredmethods="5"/>
+      <file name="LoginScreen.js" path="E:\Djanog test\Restaurant Pos System\mobile\src\screens\auth\LoginScreen.js">
+        <metrics statements="19" coveredstatements="15" conditionals="16" coveredconditionals="12" methods="5" coveredmethods="3"/>
+        <line num="11" count="14" type="stmt"/>
+        <line num="12" count="14" type="stmt"/>
+        <line num="13" count="14" type="stmt"/>
+        <line num="14" count="14" type="stmt"/>
+        <line num="15" count="14" type="stmt"/>
+        <line num="17" count="14" type="stmt"/>
+        <line num="18" count="2" type="cond" truecount="3" falsecount="1"/>
+        <line num="19" count="0" type="stmt"/>
+        <line num="20" count="0" type="stmt"/>
+        <line num="22" count="2" type="stmt"/>
+        <line num="23" count="2" type="stmt"/>
+        <line num="24" count="2" type="stmt"/>
+        <line num="26" count="1" type="cond" truecount="1" falsecount="1"/>
+        <line num="28" count="2" type="stmt"/>
+        <line num="32" count="14" type="stmt"/>
+        <line num="81" count="0" type="stmt"/>
+        <line num="118" count="0" type="stmt"/>
+        <line num="124" count="1" type="stmt"/>
+        <line num="135" count="1" type="stmt"/>
+      </file>
+      <file name="RegisterScreen.js" path="E:\Djanog test\Restaurant Pos System\mobile\src\screens\auth\RegisterScreen.js">
+        <metrics statements="21" coveredstatements="19" conditionals="18" coveredconditionals="15" methods="3" coveredmethods="2"/>
+        <line num="11" count="10" type="stmt"/>
+        <line num="12" count="10" type="stmt"/>
+        <line num="13" count="10" type="stmt"/>
+        <line num="14" count="10" type="stmt"/>
+        <line num="15" count="10" type="stmt"/>
+        <line num="16" count="10" type="stmt"/>
+        <line num="18" count="10" type="stmt"/>
+        <line num="19" count="3" type="cond" truecount="6" falsecount="0"/>
+        <line num="20" count="1" type="stmt"/>
+        <line num="21" count="1" type="stmt"/>
+        <line num="23" count="2" type="cond" truecount="2" falsecount="0"/>
+        <line num="24" count="1" type="stmt"/>
+        <line num="25" count="1" type="stmt"/>
+        <line num="27" count="1" type="stmt"/>
+        <line num="28" count="1" type="stmt"/>
+        <line num="29" count="1" type="stmt"/>
+        <line num="36" count="0" type="cond" truecount="0" falsecount="2"/>
+        <line num="38" count="1" type="stmt"/>
+        <line num="42" count="10" type="stmt"/>
+        <line num="134" count="0" type="stmt"/>
+        <line num="145" count="1" type="stmt"/>
+      </file>
+    </package>
+    <package name="services">
+      <metrics statements="101" coveredstatements="78" conditionals="74" coveredconditionals="43" methods="19" coveredmethods="13"/>
+      <file name="apiClient.js" path="E:\Djanog test\Restaurant Pos System\mobile\src\services\apiClient.js">
+        <metrics statements="101" coveredstatements="78" conditionals="74" coveredconditionals="43" methods="19" coveredmethods="13"/>
+        <line num="11" count="2" type="stmt"/>
+        <line num="12" count="2" type="stmt"/>
+        <line num="14" count="2" type="cond" truecount="0" falsecount="1"/>
+        <line num="15" count="1" type="stmt"/>
+        <line num="16" count="0" type="cond" truecount="0" falsecount="2"/>
+        <line num="17" count="0" type="stmt"/>
+        <line num="19" count="0" type="stmt"/>
+        <line num="22" count="1" type="stmt"/>
+        <line num="26" count="15" type="stmt"/>
+        <line num="30" count="5" type="stmt"/>
+        <line num="34" count="1" type="stmt"/>
+        <line num="35" count="1" type="stmt"/>
+        <line num="39" count="1" type="stmt"/>
+        <line num="40" count="1" type="stmt"/>
+        <line num="50" count="0" type="cond" truecount="0" falsecount="4"/>
+        <line num="51" count="0" type="stmt"/>
+        <line num="52" count="0" type="stmt"/>
+        <line num="53" count="0" type="cond" truecount="0" falsecount="2"/>
+        <line num="54" count="0" type="stmt"/>
+        <line num="55" count="0" type="cond" truecount="0" falsecount="4"/>
+        <line num="56" count="0" type="stmt"/>
+        <line num="58" count="0" type="stmt"/>
+        <line num="61" count="0" type="stmt"/>
+        <line num="62" count="0" type="cond" truecount="0" falsecount="2"/>
+        <line num="69" count="15" type="stmt"/>
+        <line num="71" count="15" type="stmt"/>
+        <line num="76" count="15" type="cond" truecount="2" falsecount="0"/>
+        <line num="77" count="14" type="stmt"/>
+        <line num="81" count="15" type="stmt"/>
+        <line num="82" count="15" type="cond" truecount="2" falsecount="0"/>
+        <line num="83" count="4" type="stmt"/>
+        <line num="86" count="15" type="stmt"/>
+        <line num="87" count="15" type="cond" truecount="2" falsecount="0"/>
+        <line num="89" count="15" type="stmt"/>
+        <line num="90" count="15" type="stmt"/>
+        <line num="96" count="14" type="stmt"/>
+        <line num="99" count="14" type="cond" truecount="4" falsecount="0"/>
+        <line num="102" count="3" type="stmt"/>
+        <line num="103" count="3" type="cond" truecount="2" falsecount="0"/>
+        <line num="104" count="3" type="cond" truecount="2" falsecount="0"/>
+        <line num="106" count="1" type="stmt"/>
+        <line num="108" count="2" type="cond" truecount="2" falsecount="0"/>
+        <line num="110" count="1" type="stmt"/>
+        <line num="111" count="1" type="stmt"/>
+        <line num="119" count="12" type="stmt"/>
+        <line num="120" count="12" type="cond" truecount="4" falsecount="0"/>
+        <line num="121" count="11" type="stmt"/>
+        <line num="123" count="1" type="stmt"/>
+        <line num="126" count="12" type="cond" truecount="2" falsecount="0"/>
+        <line num="132" count="4" type="cond" truecount="2" falsecount="0"/>
+        <line num="134" count="4" type="cond" truecount="3" falsecount="1"/>
+        <line num="139" count="4" type="cond" truecount="2" falsecount="0"/>
+        <line num="140" count="1" type="stmt"/>
+        <line num="144" count="3" type="stmt"/>
+        <line num="151" count="4" type="stmt"/>
+        <line num="154" count="8" type="stmt"/>
+        <line num="156" count="6" type="stmt"/>
+        <line num="158" count="6" type="cond" truecount="1" falsecount="1"/>
+        <line num="159" count="0" type="stmt"/>
+        <line num="162" count="6" type="cond" truecount="2" falsecount="0"/>
+        <line num="163" count="5" type="stmt"/>
+        <line num="166" count="1" type="stmt"/>
+        <line num="177" count="2" type="stmt"/>
+        <line num="178" count="2" type="cond" truecount="2" falsecount="0"/>
+        <line num="181" count="1" type="cond" truecount="1" falsecount="1"/>
+        <line num="182" count="0" type="stmt"/>
+        <line num="183" count="0" type="stmt"/>
+        <line num="187" count="1" type="stmt"/>
+        <line num="189" count="1" type="stmt"/>
+        <line num="190" count="1" type="stmt"/>
+        <line num="191" count="1" type="stmt"/>
+        <line num="200" count="1" type="cond" truecount="1" falsecount="1"/>
+        <line num="201" count="0" type="stmt"/>
+        <line num="202" count="0" type="stmt"/>
+        <line num="207" count="1" type="stmt"/>
+        <line num="208" count="1" type="stmt"/>
+        <line num="209" count="1" type="cond" truecount="1" falsecount="1"/>
+        <line num="211" count="1" type="cond" truecount="1" falsecount="1"/>
+        <line num="212" count="1" type="stmt"/>
+        <line num="213" count="1" type="stmt"/>
+        <line num="214" count="1" type="stmt"/>
+        <line num="217" count="0" type="stmt"/>
+        <line num="218" count="0" type="stmt"/>
+        <line num="220" count="0" type="stmt"/>
+        <line num="221" count="0" type="stmt"/>
+        <line num="223" count="1" type="stmt"/>
+        <line num="233" count="14" type="stmt"/>
+        <line num="234" count="14" type="stmt"/>
+        <line num="235" count="14" type="stmt"/>
+        <line num="236" count="14" type="stmt"/>
+        <line num="244" count="2" type="stmt"/>
+        <line num="246" count="8" type="stmt"/>
+        <line num="247" count="8" type="cond" truecount="2" falsecount="0"/>
+        <line num="248" count="8" type="stmt"/>
+        <line num="252" count="3" type="stmt"/>
+        <line num="260" count="1" type="stmt"/>
+        <line num="261" count="1" type="stmt"/>
+        <line num="262" count="1" type="stmt"/>
+        <line num="271" count="0" type="stmt"/>
+        <line num="277" count="1" type="stmt"/>
+        <line num="283" count="1" type="stmt"/>
+      </file>
+    </package>
+    <package name="utils">
+      <metrics statements="10" coveredstatements="10" conditionals="21" coveredconditionals="21" methods="2" coveredmethods="2"/>
+      <file name="data.js" path="E:\Djanog test\Restaurant Pos System\mobile\src\utils\data.js">
+        <metrics statements="10" coveredstatements="10" conditionals="21" coveredconditionals="21" methods="2" coveredmethods="2"/>
+        <line num="5" count="1" type="stmt"/>
+        <line num="7" count="10" type="cond" truecount="2" falsecount="0"/>
+        <line num="8" count="9" type="cond" truecount="4" falsecount="0"/>
+        <line num="10" count="5" type="cond" truecount="2" falsecount="0"/>
+        <line num="12" count="4" type="cond" truecount="2" falsecount="0"/>
+        <line num="13" count="3" type="cond" truecount="2" falsecount="0"/>
+        <line num="14" count="2" type="cond" truecount="2" falsecount="0"/>
+        <line num="16" count="1" type="stmt"/>
+        <line num="19" count="1" type="stmt"/>
+        <line num="20" count="5" type="cond" truecount="5" falsecount="0"/>
+      </file>
+    </package>
+  </project>
+</coverage>
