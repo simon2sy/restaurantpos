@@ -1,4 +1,4 @@
-import React, { useCallback } from 'react';
+import React, { useCallback, useEffect } from 'react';
 import { StatusBar } from 'expo-status-bar';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { useFonts } from 'expo-font';
@@ -10,8 +10,9 @@ import AppNavigator from './src/navigation/AppNavigator';
 import ErrorBoundary from './src/components/ErrorBoundary';
 import { PushNotificationProvider } from './src/context/PushNotificationProvider';
 
-// Keep splash screen visible while fonts load
-SplashScreen.preventAutoHideAsync();
+// Keep splash screen visible while fonts load.
+// Catch rejections — an unhandled one here can leave the app stuck on splash.
+SplashScreen.preventAutoHideAsync().catch(() => {});
 
 export default function App() {
   // Canonical, reliable way to load @expo/vector-icons fonts so glyph icons
@@ -24,15 +25,26 @@ export default function App() {
     ...Ionicons.font,
   });
 
-  const onLayoutRootView = useCallback(async () => {
-    if (fontsLoaded || fontError) {
-      await SplashScreen.hideAsync();
+  const ready = fontsLoaded || !!fontError;
+
+  // Primary splash-hide path: fires whenever the app becomes ready,
+  // regardless of whether a layout event happens to occur.
+  useEffect(() => {
+    if (ready) {
+      SplashScreen.hideAsync().catch(() => {});
     }
-  }, [fontsLoaded, fontError]);
+  }, [ready]);
+
+  // Backup path: hide on first layout too (harmless if already hidden).
+  const onLayoutRootView = useCallback(() => {
+    if (ready) {
+      SplashScreen.hideAsync().catch(() => {});
+    }
+  }, [ready]);
 
   // Show splash while loading. If a font legitimately fails to load we still
   // proceed (fontError set) so the app isn't stuck on the splash screen.
-  if (!fontsLoaded && !fontError) {
+  if (!ready) {
     return null;
   }
 
