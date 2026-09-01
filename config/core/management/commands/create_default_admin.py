@@ -26,7 +26,7 @@ class Command(BaseCommand):
             return
 
         username = os.environ.get("ADMIN_USERNAME", "restaurant")
-        password = os.environ.get("ADMIN_PASSWORD", "Admin@123")
+        password = os.environ.get("ADMIN_PASSWORD", "Admin@12345")
         email = os.environ.get("ADMIN_EMAIL", "admin@restaurant.com")
 
         user = User.objects.create_superuser(

@@ -1,6 +1,9 @@
+import logging
 from rest_framework.views import exception_handler
 from rest_framework.response import Response
 from rest_framework import status
+
+logger = logging.getLogger(__name__)
 
 
 def custom_exception_handler(exc, context):
@@ -14,7 +17,16 @@ def custom_exception_handler(exc, context):
         }
         response.data = data
     else:
-        # Unhandled exceptions (500s)
+        # Unhandled exceptions (500s) — log the REAL error for debugging
+        logger.error(
+            "Unhandled exception in %s: %s",
+            context.get("view", "?"),
+            exc,
+            exc_info=True,
+        )
+        # Also print to stderr so Render logs capture it
+        print(f"[500] {context.get('view', '?')} -> {type(exc).__name__}: {exc}")
+
         response = Response(
             {
                 "success": False,

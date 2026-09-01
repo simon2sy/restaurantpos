@@ -39,7 +39,11 @@ class LoginView(APIView):
     throttle_classes = ["rest_framework.throttling.AnonRateThrottle"]
 
     def post(self, request):
-        from django.core.cache import cache
+        # Cache import — wrapped so broken cache never blocks login
+        try:
+            from django.core.cache import cache as _cache
+        except Exception:
+            _cache = None
 
         username = request.data.get("username", "").strip()
         password = request.data.get("password", "")
@@ -54,24 +58,31 @@ class LoginView(APIView):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        # Check per-user lockout
+        # Check per-user lockout (cache is best-effort)
         lockout_key = f"user_lockout_{username}"
-        if cache.get(lockout_key, 0) >= 5:
-            return Response(
-                {
-                    "success": False,
-                    "message": "Too many failed sign-in attempts. Please try again in 15 minutes.",
-                    "errors": {},
-                },
-                status=status.HTTP_429_TOO_MANY_REQUESTS,
-            )
+        try:
+            if _cache and _cache.get(lockout_key, 0) >= 5:
+                return Response(
+                    {
+                        "success": False,
+                        "message": "Too many failed sign-in attempts. Please try again in 15 minutes.",
+                        "errors": {},
+                    },
+                    status=status.HTTP_429_TOO_MANY_REQUESTS,
+                )
+        except Exception:
+            pass  # Cache unavailable — skip lockout
 
         user = authenticate(username=username, password=password)
 
         if user is None:
-            # Record failure
-            attempts = cache.get(lockout_key, 0)
-            cache.set(lockout_key, attempts + 1, 900)
+            # Record failure (best-effort)
+            try:
+                if _cache:
+                    attempts = _cache.get(lockout_key, 0)
+                    _cache.set(lockout_key, attempts + 1, 900)
+            except Exception:
+                pass
 
             return Response(
                 {
@@ -104,11 +115,28 @@ class LoginView(APIView):
                 status=status.HTTP_403_FORBIDDEN,
             )
 
-        # Clear lockout on success
-        cache.delete(lockout_key)
+        # Clear lockout on success (best-effort)
+        try:
+            if _cache:
+                _cache.delete(lockout_key)
+        except Exception:
+            pass
 
         # Generate JWT tokens
-        refresh = RefreshToken.for_user(user)
+        try:
+            refresh = RefreshToken.for_user(user)
+        except Exception as exc:
+            import logging
+            logging.getLogger(__name__).error("JWT token creation failed: %s", exc)
+            return Response(
+                {
+                    "success": False,
+                    "message": "Authentication system error. Please try again.",
+                    "errors": {},
+                },
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
+
         access_token = refresh.access_token
 
         # Add custom claims
@@ -125,10 +153,13 @@ class LoginView(APIView):
 
         # Record activity
         if profile:
-            record_activity(
-                profile, "API_LOGIN",
-                detail=f"API login from {request.META.get('REMOTE_ADDR', 'unknown')}",
-            )
+            try:
+                record_activity(
+                    profile, "API_LOGIN",
+                    detail=f"API login from {request.META.get('REMOTE_ADDR', 'unknown')}",
+                )
+            except Exception:
+                pass  # Activity recording is best-effort
 
         return Response(
             {
