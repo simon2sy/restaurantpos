@@ -235,8 +235,8 @@ class OrderListCreateView(generics.ListCreateAPIView):
                     {"date": "Invalid date. Use YYYY-MM-DD."}
                 )
             from django.utils import timezone as tz
-            start = tz.make_aware(dtime.combine(day, dtime.min))
-            end = tz.make_aware(dtime.combine(day, dtime.max))
+            start = tz.make_aware(datetime.combine(day, dtime.min))
+            end = tz.make_aware(datetime.combine(day, dtime.max))
             qs = qs.filter(created_at__range=(start, end))
 
         return qs

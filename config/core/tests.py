@@ -446,8 +446,8 @@ class SalesReportTests(TestCase):
         response = self.client.get("/reports/")
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "Sales Reports")
-        self.assertContains(response, "Daily sales")
-        self.assertContains(response, "Monthly sales")
+        self.assertContains(response, "Daily Sales Trend")
+        self.assertContains(response, "Monthly Summary")
 
     def test_waiter_cannot_access_reports(self):
         self.client.post("/accounts/login/", {

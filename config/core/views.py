@@ -2,6 +2,7 @@ from datetime import timedelta
 
 from django.contrib.auth.decorators import login_required
 from django.db.models import Count, Sum
+from django.db.models.functions import Coalesce
 from django.shortcuts import redirect, render
 from django.utils import timezone
 
@@ -63,8 +64,8 @@ def admin_dashboard(request):
     stats = {
         "orders_today": todays_orders.count(),
         "revenue_today": (
-            Order.objects.filter(
-                created_at__gte=today,
+            Order.objects.annotate(revenue_ts=Coalesce("paid_at", "created_at")).filter(
+                revenue_ts__gte=today,
                 payment_status=Order.PaymentStatus.PAID,
             ).aggregate(total=Sum("total"))["total"]
             or 0

@@ -1,7 +1,7 @@
 from datetime import datetime, timedelta
 
 from django.db.models import Count, F, Sum
-from django.db.models.functions import TruncDate, TruncMonth
+from django.db.models.functions import Coalesce, TruncDate, TruncMonth
 from django.utils import timezone
 from rest_framework import generics, status
 from rest_framework.response import Response
@@ -83,14 +83,14 @@ class SalesReportView(APIView):
     def get(self, request):
         start_dt, end_dt, from_d, to_d = _resolve_range(request)
 
-        paid_orders = Order.objects.filter(
+        paid_orders = Order.objects.annotate(revenue_ts=Coalesce("paid_at", "created_at")).filter(
             payment_status=Order.PaymentStatus.PAID
         ).exclude(status=Order.Status.CANCELLED)
 
         if start_dt:
-            paid_orders = paid_orders.filter(created_at__gte=start_dt)
+            paid_orders = paid_orders.filter(revenue_ts__gte=start_dt)
         if end_dt:
-            paid_orders = paid_orders.filter(created_at__lte=end_dt)
+            paid_orders = paid_orders.filter(revenue_ts__lte=end_dt)
 
         # Summary
         summary = paid_orders.aggregate(
@@ -129,7 +129,7 @@ class SalesReportView(APIView):
             daily_map = {
                 r["day"]: r
                 for r in (
-                    paid_orders.annotate(day=TruncDate("created_at"))
+                    paid_orders.annotate(day=TruncDate("revenue_ts"))
                     .values("day")
                     .annotate(revenue=Sum("total"), orders=Count("id"))
                 )
@@ -148,7 +148,7 @@ class SalesReportView(APIView):
 
         # Monthly breakdown
         monthly = list(
-            paid_orders.annotate(month=TruncMonth("created_at"))
+            paid_orders.annotate(month=TruncMonth("revenue_ts"))
             .values("month")
             .annotate(revenue=Sum("total"), orders=Count("id"))
             .order_by("-month")[:12]
@@ -160,9 +160,9 @@ class SalesReportView(APIView):
         # Category performance
         cat_items = OrderItem.objects.filter(batch__order__payment_status=Order.PaymentStatus.PAID)
         if start_dt:
-            cat_items = cat_items.filter(batch__order__created_at__gte=start_dt)
+            cat_items = cat_items.filter(batch__order__paid_at__gte=start_dt)
         if end_dt:
-            cat_items = cat_items.filter(batch__order__created_at__lte=end_dt)
+            cat_items = cat_items.filter(batch__order__paid_at__lte=end_dt)
 
         by_category = list(
             cat_items.exclude(batch__order__status=Order.Status.CANCELLED)
@@ -263,8 +263,8 @@ class DashboardStatsView(APIView):
         stats = {
             "orders_today": todays_orders.count(),
             "revenue_today": str(
-                Order.objects.filter(
-                    created_at__gte=today,
+                Order.objects.annotate(revenue_ts=Coalesce("paid_at", "created_at")).filter(
+                    revenue_ts__gte=today,
                     payment_status=Order.PaymentStatus.PAID,
                 ).aggregate(total=Sum("total"))["total"] or 0
             ),

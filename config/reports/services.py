@@ -4,18 +4,32 @@ from datetime import timedelta
 from decimal import Decimal
 
 from django.db.models import Count, F, Q, Sum
-from django.db.models.functions import TruncDate, TruncMonth, TruncWeek
+from django.db.models.functions import Coalesce, TruncDate, TruncWeek, TruncMonth
 from django.utils import timezone
 
 from orders.models import Order, OrderItem
 
 
 def _order_base(start=None, end=None):
+    """Base queryset. Note: paid revenue elsewhere is keyed on paid_at
+    (via ``revenue_ts``); this base keeps created_at for order counts."""
     qs = Order.objects.all()
     if start is not None:
         qs = qs.filter(created_at__gte=start)
     if end is not None:
         qs = qs.filter(created_at__lte=end)
+    return qs
+
+
+def _paid_revenue_qs(start=None, end=None):
+    """Paid orders within a range, keyed on when payment happened."""
+    qs = Order.objects.annotate(
+        revenue_ts=Coalesce("paid_at", "created_at")
+    ).filter(payment_status=Order.PaymentStatus.PAID)
+    if start is not None:
+        qs = qs.filter(revenue_ts__gte=start)
+    if end is not None:
+        qs = qs.filter(revenue_ts__lte=end)
     return qs
 
 
@@ -67,7 +81,7 @@ def daily_sales(date=None):
     start, end = _day_bounds()
     qs = _order_base(start, end)
 
-    paid = qs.filter(payment_status=Order.PaymentStatus.PAID)
+    paid = _paid_revenue_qs(start, end)
 
     paid_orders = paid.count()
     total_sales = paid.aggregate(v=Sum("total"))["v"] or 0
@@ -156,9 +170,8 @@ def sales_series(start, end, bucket="day"):
     }[bucket]
 
     rows = (
-        _order_base(start, end)
-        .filter(payment_status=Order.PaymentStatus.PAID)
-        .annotate(bucket=trunc("created_at"))
+        _paid_revenue_qs(start, end)
+        .annotate(bucket=trunc("revenue_ts"))
         .values("bucket")
         .annotate(sales=Sum("total"), count=Count("id"))
         .order_by("bucket")
@@ -178,8 +191,7 @@ def sales_series(start, end, bucket="day"):
 
 def payment_method_breakdown(start=None, end=None):
     return (
-        _order_base(start, end)
-        .filter(payment_status=Order.PaymentStatus.PAID)
+        _paid_revenue_qs(start, end)
         .values("payment_method")
         .annotate(total=Sum("total"))
         .order_by()
@@ -188,8 +200,7 @@ def payment_method_breakdown(start=None, end=None):
 
 def order_type_breakdown(start=None, end=None):
     return (
-        _order_base(start, end)
-        .filter(payment_status=Order.PaymentStatus.PAID)
+        _paid_revenue_qs(start, end)
         .values("order_type")
         .annotate(total=Sum("total"), count=Count("id"))
         .order_by()
