@@ -214,6 +214,43 @@ def notify_kitchen(batch):
         },
     )
 
+    # --- FCM push notification to all kitchen staff (best-effort) ---
+    try:
+        from core.push import send_push_to_role
+
+        table_num = batch.order.table.number if batch.order.table_id else None
+        cabin_num = batch.order.cabin.number if batch.order.cabin_id else None
+        if delivery_info:
+            location = f"Delivery → {delivery_info['customer_name']}"
+        elif table_num:
+            location = f"Table {table_num}"
+        elif cabin_num:
+            location = f"Cabin {cabin_num}"
+        else:
+            location = "Order"
+
+        items_text = ", ".join(
+            f"{item['quantity']}x {item['name']}" for item in items[:3]
+        )
+        if len(items) > 3:
+            items_text += f" +{len(items) - 3} more"
+
+        send_push_to_role(
+            role="KITCHEN",
+            title=f"🔥 New Order #{batch.order.order_number}",
+            body=f"{location}: {items_text}",
+            data={
+                "type": "new_order",
+                "order_id": order.id,
+                "order_number": order.order_number,
+                "batch_id": batch.id,
+            },
+            sound=True,
+        )
+    except Exception:
+        # Push notifications are best-effort; never block kitchen workflow.
+        pass
+
 def notify_batch_status(batch):
 
     channel_layer = get_channel_layer()

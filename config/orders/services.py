@@ -562,20 +562,17 @@ def check_stock_for_menu_item(menu_item, quantity=1):
 # ============================================================
 
 def deduct_inventory(order):
-    """Deduct recipe ingredients for served/ready items in an order."""
+    """Deduct recipe ingredients for all items in a paid order.
+
+    Called only from complete_payment(), so all items should be deducted.
+    """
     from django.db.models import Sum
 
     from menu.models import Ingredient, RecipeItem, StockMovement
 
     quantities = (
         OrderItem.objects
-        .filter(
-            batch__order=order,
-            status__in=[
-                OrderItem.Status.SERVED,
-                OrderItem.Status.READY,
-            ],
-        )
+        .filter(batch__order=order)
         .values("menu_item")
         .annotate(total=Sum("quantity"))
     )
