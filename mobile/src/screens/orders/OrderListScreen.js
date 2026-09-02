@@ -21,11 +21,31 @@ const STATUS_COLORS = {
 
 const STATUS_OPTIONS = ['All', 'OPEN', 'PREPARING', 'READY', 'SERVED'];
 
+// "Feb 9, 2026 · 8:45 PM" style formatting for the order timestamps.
+function formatDateTime(iso) {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return '';
+  const date = d.toLocaleDateString(undefined, {
+    month: 'short', day: 'numeric', year: 'numeric',
+  });
+  const time = d.toLocaleTimeString(undefined, {
+    hour: 'numeric', minute: '2-digit',
+  });
+  return `${date} · ${time}`;
+}
+
 function OrderCard({ order, onPress }) {
   return (
     <TouchableOpacity style={styles.orderCard} onPress={onPress} activeOpacity={0.7}>
       <View style={styles.orderHeader}>
-        <Text style={styles.orderNumber}>#{order.order_number}</Text>
+        <View>
+          <Text style={styles.orderNumber}>#{order.order_number}</Text>
+          {order.created_at && (
+            <Text style={styles.orderDate}>
+              {formatDateTime(order.created_at)}
+            </Text>
+          )}
+        </View>
         <View style={[styles.statusBadge, { backgroundColor: STATUS_COLORS[order.status] + '20' }]}>
           <Text style={[styles.statusText, { color: STATUS_COLORS[order.status] }]}>
             {order.status}
@@ -237,6 +257,7 @@ const styles = StyleSheet.create({
     marginBottom: SPACING.sm,
   },
   orderNumber: { fontSize: 18, fontWeight: '700', color: COLORS.textPrimary },
+  orderDate: { fontSize: 12, color: COLORS.textMuted, marginTop: 2 },
   statusBadge: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 12 },
   statusText: { fontSize: 12, fontWeight: '600' },
   orderInfo: { gap: 4, marginBottom: SPACING.sm },

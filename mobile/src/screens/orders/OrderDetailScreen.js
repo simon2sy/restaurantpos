@@ -18,6 +18,19 @@ const STATUS_COLORS = {
   CANCELLED: COLORS.orderCancelled,
 };
 
+// "Feb 9, 2026 · 8:45 PM" style formatting for the order timestamps.
+function formatDateTime(iso) {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return '';
+  const date = d.toLocaleDateString(undefined, {
+    month: 'short', day: 'numeric', year: 'numeric',
+  });
+  const time = d.toLocaleTimeString(undefined, {
+    hour: 'numeric', minute: '2-digit',
+  });
+  return `${date} · ${time}`;
+}
+
 export default function OrderDetailScreen({ route, navigation }) {
   const { orderId } = route.params;
   const { isCashier } = useAuth();
@@ -64,6 +77,16 @@ export default function OrderDetailScreen({ route, navigation }) {
       <View style={styles.header}>
         <View>
           <Text style={styles.orderNumber}>Order #{order.order_number}</Text>
+          {order.created_at && (
+            <Text style={styles.orderDate}>
+              📅 {formatDateTime(order.created_at)}
+            </Text>
+          )}
+          {order.paid_at && (
+            <Text style={styles.orderDate}>
+              💳 Paid {formatDateTime(order.paid_at)}
+            </Text>
+          )}
           <Text style={styles.orderType}>{order.order_type === 'DELIVERY' ? '🛵 Delivery' : '🍽️ Dine-in'}</Text>
         </View>
         <View style={[styles.statusBadge, { backgroundColor: STATUS_COLORS[order.status] + '20' }]}>
@@ -178,6 +201,7 @@ const styles = StyleSheet.create({
   },
   orderNumber: { fontSize: 22, fontWeight: '700', color: COLORS.textPrimary },
   orderType: { fontSize: 14, color: COLORS.textSecondary, marginTop: 4 },
+  orderDate: { fontSize: 13, color: COLORS.textMuted, marginTop: 4, fontWeight: '500' },
   statusBadge: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 12 },
   statusText: { fontSize: 13, fontWeight: '600' },
   infoCard: {

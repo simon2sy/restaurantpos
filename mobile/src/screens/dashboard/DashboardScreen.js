@@ -118,10 +118,13 @@ export default function DashboardScreen({ navigation }) {
     fetchData(p);
   };
 
-  const periodLabel = { today: 'Today', '7': 'Week', '30': '30 Days' }[period];
+  const periodLabel = { today: 'Today', '7': 'Week', month: 'This Month' }[period];
   const greeting = getGreeting();
   const revenue = summary?.total_revenue ?? stats?.revenue_today ?? 0;
   const ordersCount = summary?.total_orders ?? stats?.orders_today ?? 0;
+  // Profit = revenue earned (paid orders) minus expenses recorded for the
+  // same period. Shown inside the revenue hero card.
+  const profit = Number(revenue) - Number(expenseTotal);
   const occupied =
     (stats?.tables_occupied ?? 0) + (stats?.cabins_occupied ?? 0);
 
@@ -135,6 +138,7 @@ export default function DashboardScreen({ navigation }) {
       label: `${periodLabel} Revenue`,
       value: `Rs. ${Number(revenue).toLocaleString()}`,
       sub: 'from paid orders',
+      profit,
       icon: 'wallet-outline',
       grad: ['#c084fc', '#7c3aed'],
     },
@@ -192,6 +196,7 @@ export default function DashboardScreen({ navigation }) {
       if (Array.isArray(data)) {
         setReadyOrders(
           data.slice(0, 5).map((n) => ({
+            id: n.id,
             order_number: n.order_number,
             table: n.table_number,
             cabin: n.cabin_number,
@@ -245,6 +250,23 @@ export default function DashboardScreen({ navigation }) {
 
   const onRefresh = () => { setRefreshing(true); fetchData(period); };
 
+  // "View" on the ready banner: dismiss these notifications server-side and
+  // remove them from the dashboard banner immediately.
+  const handleViewReadyOrders = async () => {
+    const toDismiss = [...readyOrders];
+    setReadyOrders([]);
+    navigation.navigate('Orders');
+    await Promise.all(
+      toDismiss
+        .filter((o) => o.id != null)
+        .map((o) =>
+          notificationApi.dismiss(o.id).catch(() => {
+            // Non-critical — will reappear on next refresh if it fails.
+          })
+        )
+    );
+  };
+
   if (loading) return <LoadingSpinner />;
   if (error) return <ErrorView message={error} onRetry={fetchData} />;
 
@@ -273,7 +295,7 @@ export default function DashboardScreen({ navigation }) {
             <Text style={styles.userName}>{user?.first_name || user?.username}</Text>
           </View>
         </View>
-        <TouchableOpacity style={styles.bellButton} onPress={() => navigation.navigate('Orders')}>
+        <TouchableOpacity style={styles.bellButton} onPress={() => navigation.navigate('Notifications')}>
           <Ionicons name="notifications-outline" size={22} color={COLORS.textPrimary} />
           {readyOrders.length > 0 && <View style={styles.bellDot} />}
         </TouchableOpacity>
@@ -284,7 +306,7 @@ export default function DashboardScreen({ navigation }) {
         {[
           { key: 'today', label: 'Today' },
           { key: '7', label: 'Week' },
-          { key: '30', label: '30 Days' },
+          { key: 'month', label: 'Month' },
         ].map((p) => (
           <TouchableOpacity
             key={p.key}
@@ -313,7 +335,7 @@ export default function DashboardScreen({ navigation }) {
               </Text>
             ))}
           </View>
-          <TouchableOpacity onPress={() => navigation.navigate('Orders')}>
+          <TouchableOpacity onPress={handleViewReadyOrders}>
             <Text style={styles.readyBannerAction}>View</Text>
           </TouchableOpacity>
         </View>
@@ -346,6 +368,19 @@ export default function DashboardScreen({ navigation }) {
                     </View>
                     <Text style={styles.revenueValue}>{s.value}</Text>
                     <Text style={styles.revenueSub}>{s.sub}</Text>
+                    {s.key === 'revenue' && s.profit != null && (
+                      <View style={styles.profitRow}>
+                        <Ionicons
+                          name={s.profit >= 0 ? 'trending-up' : 'trending-down'}
+                          size={13}
+                          color="#fff"
+                        />
+                        <Text style={styles.profitLabel}>Profit: </Text>
+                        <Text style={styles.profitValue}>
+                          Rs. {Number(s.profit).toLocaleString()}
+                        </Text>
+                      </View>
+                    )}
                   </View>
                   <View style={styles.trendWrap}>
                     <Ionicons name="trending-up" size={100} color="#a7f3d0" style={styles.trendIcon} />
@@ -506,6 +541,19 @@ const styles = StyleSheet.create({
   revenueLabel: { fontSize: 13, color: 'rgba(255,255,255,0.9)', fontWeight: '600' },
   revenueValue: { fontSize: 32, fontWeight: '800', color: '#fff', marginTop: 6 },
   revenueSub: { fontSize: 11, color: 'rgba(255,255,255,0.75)', marginTop: 4, fontWeight: '500' },
+  profitRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    marginTop: 8,
+    backgroundColor: 'rgba(255,255,255,0.18)',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 12,
+    alignSelf: 'flex-start',
+  },
+  profitLabel: { fontSize: 11, color: 'rgba(255,255,255,0.85)', fontWeight: '600' },
+  profitValue: { fontSize: 13, color: '#fff', fontWeight: '800' },
   trendWrap: { width: 120, height: 105, justifyContent: 'center', alignItems: 'flex-end' },
   trendIcon: { opacity: 0.9 },
 

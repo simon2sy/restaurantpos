@@ -9,4 +9,5 @@ urlpatterns = [
     path("dashboard/", views.DashboardStatsView.as_view(), name="dashboard_stats"),
     path("expenses/", views.ExpenseListCreateView.as_view(), name="expense_list"),
     path("expenses/summary/", views.ExpenseSummaryView.as_view(), name="expense_summary"),
+    path("daily-summary/trigger/", views.DailySummaryTriggerView.as_view(), name="daily_summary_trigger"),
 ]

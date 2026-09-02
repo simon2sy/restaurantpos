@@ -24,13 +24,19 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/6.1/howto/deployment/checklist/
 
-# SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = os.environ.get(
-    "SECRET_KEY",
-    "django-development-secret-change-this"
-)
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = os.getenv("DEBUG", "False").strip().lower() in ("1", "true", "yes")
+
+# SECURITY WARNING: keep the secret key used in production secret!
+# In production, SECRET_KEY MUST be set via environment variable.
+# The fallback is only for local development — it must never reach production.
+if not DEBUG:
+    SECRET_KEY = os.environ["SECRET_KEY"]  # Crashes immediately if missing
+else:
+    SECRET_KEY = os.environ.get(
+        "SECRET_KEY",
+        "django-development-secret-change-this"
+    )
 
 ALLOWED_HOSTS = [
     host.strip()
@@ -42,10 +48,10 @@ ALLOWED_HOSTS = [
 if not ALLOWED_HOSTS and DEBUG:
     ALLOWED_HOSTS = ["127.0.0.1", "localhost", "testserver"]
 
-# PaaS fallback (Railway/Render testing): allow the platform's default
-# domain so the HTTP healthcheck passes even before the env var is set.
+# Production fallback: allow Render's default domain for healthchecks.
+# Pin to your exact domain in ALLOWED_HOSTS env var for production.
 if not ALLOWED_HOSTS and not DEBUG:
-    ALLOWED_HOSTS = [".railway.app", ".up.railway.app", ".onrender.com"]
+    ALLOWED_HOSTS = ["restaurantpos-1bmq.onrender.com"]
 
 
 # Application definition
@@ -62,6 +68,7 @@ INSTALLED_APPS = [
     "rest_framework_simplejwt",
     "rest_framework_simplejwt.token_blacklist",
     "channels",
+    "drf_spectacular",
     "core",
     "accounts",
     "menu",
@@ -239,7 +246,6 @@ MEDIA_URL = "media/"
 MEDIA_ROOT = BASE_DIR / "media"
 
 # Authentication redirects
-LOGIN_URL = "accounts:login"
 LOGIN_REDIRECT_URL = "core:home"
 LOGOUT_REDIRECT_URL = "accounts:login"
 
@@ -253,21 +259,14 @@ SECURE_CONTENT_TYPE_NOSNIFF = True
 SECURE_REFERRER_POLICY = "same-origin"
 
 if not DEBUG:
-    # Production-only transport security.
-    # ENABLE_SSL_REDIRECT defaults to False so PaaS internal HTTP
-    # healthchecks (which arrive without TLS headers) get a 200 instead
-    # of a 301. Set ENABLE_SSL_REDIRECT=true once a real domain/CDN is
-    # in front of the app.
-    _ssl_redirect = os.getenv("ENABLE_SSL_REDIRECT", "false").strip().lower() in (
-        "1", "true", "yes",
-    )
+    # Production transport security — enabled by default for safety.
     SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
-    SESSION_COOKIE_SECURE = _ssl_redirect
-    CSRF_COOKIE_SECURE = _ssl_redirect
-    SECURE_SSL_REDIRECT = _ssl_redirect
-    SECURE_HSTS_SECONDS = 31536000 if _ssl_redirect else 0
-    SECURE_HSTS_INCLUDE_SUBDOMAINS = _ssl_redirect
-    SECURE_HSTS_PRELOAD = _ssl_redirect
+    SECURE_SSL_REDIRECT = True
+    SESSION_COOKIE_SECURE = True
+    CSRF_COOKIE_SECURE = True
+    SECURE_HSTS_SECONDS = 31536000  # 1 year
+    SECURE_HSTS_INCLUDE_SUBDOMAINS = True
+    SECURE_HSTS_PRELOAD = True
 
 # CSRF trusted origins (for reverse-proxy production deployments)
 CSRF_TRUSTED_ORIGINS = [
@@ -357,6 +356,7 @@ REST_FRAMEWORK = {
         "login": "10/min",
     },
     "EXCEPTION_HANDLER": "core.exceptions.custom_exception_handler",
+    "DEFAULT_SCHEMA_CLASS": "drf_spectacular.openapi.AutoSchema",
     "DEFAULT_RENDERER_CLASSES": [
         "rest_framework.renderers.JSONRenderer",
     ],
@@ -379,6 +379,79 @@ SIMPLE_JWT = {
     "AUTH_HEADER_TYPES": ("Bearer",),
     "AUTH_TOKEN_CLASSES": ("rest_framework_simplejwt.tokens.AccessToken",),
     "TOKEN_OBTAIN_SERIALIZER": "accounts.api.serializers.CustomTokenObtainPairSerializer",
+}
+
+# ------------------------------------------------------------------
+# Sentry — error tracking (set SENTRY_DSN env var to enable)
+# ------------------------------------------------------------------
+SENTRY_DSN = os.getenv("SENTRY_DSN", "")
+if SENTRY_DSN and not DEBUG:
+    try:
+        import sentry_sdk
+        from sentry_sdk.integrations.django import DjangoIntegration
+        sentry_sdk.init(
+            dsn=SENTRY_DSN,
+            integrations=[DjangoIntegration()],
+            traces_sample_rate=0.1,  # 10% of transactions
+            send_default_pii=False,
+        )
+    except ImportError:
+        pass  # sentry-sdk not installed — skip silently
+
+# ------------------------------------------------------------------
+# Logging
+# ------------------------------------------------------------------
+LOGGING = {
+    "version": 1,
+    "disable_existing_loggers": False,
+    "formatters": {
+        "verbose": {
+            "format": "[{levelname}] {asctime} {module} {message}",
+            "style": "{",
+        },
+    },
+    "handlers": {
+        "console": {
+            "class": "logging.StreamHandler",
+            "formatter": "verbose",
+        },
+    },
+    "root": {
+        "handlers": ["console"],
+        "level": os.getenv("LOG_LEVEL", "WARNING"),
+    },
+    "loggers": {
+        "django": {
+            "handlers": ["console"],
+            "level": "WARNING",
+            "propagate": False,
+        },
+        "django.request": {
+            "handlers": ["console"],
+            "level": "ERROR",
+            "propagate": False,
+        },
+    },
+}
+
+# ------------------------------------------------------------------
+# drf-spectacular — OpenAPI / Swagger docs
+# ------------------------------------------------------------------
+SPECTACULAR_SETTINGS = {
+    "TITLE": "Restaurant POS API",
+    "DESCRIPTION": "REST API for the Restaurant Point-of-Sale system",
+    "VERSION": "1.0.0",
+    "SERVE_INCLUDE_SCHEMA": False,
+    "COMPONENT_SPLIT_REQUEST": True,
+    "TAGS": [
+        {"name": "Auth", "description": "Login, register, token refresh"},
+        {"name": "Menu", "description": "Menu items and ingredients"},
+        {"name": "Orders", "description": "Order creation and management"},
+        {"name": "Kitchen", "description": "Kitchen dashboard and workflow"},
+        {"name": "Delivery", "description": "Delivery assignment and tracking"},
+        {"name": "Reports", "description": "Sales and operational reports"},
+        {"name": "Employees", "description": "Employee management"},
+    ],
 }
 
 # ------------------------------------------------------------------

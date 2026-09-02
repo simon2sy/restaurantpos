@@ -29,6 +29,7 @@ export default function MoreScreen({ navigation }) {
       title: 'Management',
       items: [
         isManager && { key: 'AddMenuItem', icon: 'add-circle', color: COLORS.success, label: 'Add Menu Item', onPress: () => navigation.navigate('Menu', { screen: 'AddMenuItem' }) },
+        isManager && { key: 'StockIn', icon: 'cube', color: COLORS.info, label: 'Stock In', onPress: () => navigation.navigate('Menu', { screen: 'StockIn' }) },
         isManager && { key: 'Expenses', icon: 'card', color: '#be185d', label: 'Expenses', onPress: () => navigation.navigate('Expenses') },
         isManager && { key: 'Reports', icon: 'analytics', color: COLORS.primary, label: 'Sales Reports', onPress: () => navigation.navigate('Reports') },
         isManager && { key: 'Employees', icon: 'people', color: COLORS.primaryLight, label: 'Employees', onPress: () => navigation.navigate('Employees') },

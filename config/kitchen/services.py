@@ -160,7 +160,6 @@ def complete_batch(batch):
     return batch
 
 
-
 def notify_kitchen(batch):
 
     channel_layer = get_channel_layer()

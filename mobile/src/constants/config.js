@@ -3,8 +3,8 @@
 // PRODUCTION  – uncomment the Render URL for APK builds
 // LOCAL DEV   – use your LAN IP for Expo Go on same WiFi
 // ────────────────────────────────────────────────────────────
-export const API_BASE_URL = 'https://restaurantpos-1bmq.onrender.com'; // Production (Render)
-// export const API_BASE_URL = 'http://192.168.100.104:8000'; // Local dev (Expo Go)
+// export const API_BASE_URL = 'https://restaurantpos-1bmq.onrender.com'; // Production (Render)
+export const API_BASE_URL = 'http://192.168.100.104:8000'; // Local dev (Expo Go) — your current LAN IP
 // export const API_BASE_URL = 'http://10.0.2.2:8000'; // Android emulator
 // export const API_BASE_URL = 'http://localhost:8000'; // iOS simulator
 
@@ -23,3 +23,6 @@ export const REQUEST_TIMEOUT = 30000; // 30 seconds
 
 // Pagination
 export const DEFAULT_PAGE_SIZE = 50;
+
+// Sentry (set in .env or leave empty to disable)
+export const SENTRY_DSN = '';

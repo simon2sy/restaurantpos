@@ -131,13 +131,59 @@ class IngredientDetailView(generics.RetrieveUpdateDestroyAPIView):
             return [IsSuperUser()]
         if self.request.method in ("PUT", "PATCH"):
             return [IsSuperUserOrManager()]
-        return [IsAnyStaff()]
+        return [IsAnyStaff()]# ============================================================
+# MENU ITEM STOCK CHECK
+# ============================================================
+
+
+class MenuItemStockView(APIView):
+    """GET /api/v1/menu/items/<pk>/stock/
+
+    Check ingredient stock availability for a menu item.
+    Returns required vs available for each ingredient.
+    """
+
+    permission_classes = [IsAnyStaff]
+
+    def get(self, request, pk):
+        try:
+            menu_item = MenuItem.objects.get(pk=pk)
+        except MenuItem.DoesNotExist:
+            return Response(
+                {"success": False, "message": "Menu item not found.", "errors": {}},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        try:
+            quantity = int(request.query_params.get("quantity", 1))
+        except (ValueError, TypeError):
+            quantity = 1
+        if quantity < 1:
+            quantity = 1
+
+        from orders.services import check_stock_for_menu_item
+        stock_info = check_stock_for_menu_item(menu_item, quantity)
+
+        can_make = all(item["sufficient"] for item in stock_info)
+
+        return Response(
+            {
+                "success": True,
+                "message": f"Stock check for {menu_item.name} (qty: {quantity}).",
+                "data": {
+                    "menu_item": menu_item.name,
+                    "quantity": quantity,
+                    "can_make": can_make,
+                    "ingredients": stock_info,
+                },
+            },
+            status=status.HTTP_200_OK,
+        )
 
 
 # ============================================================
 # STOCK ADJUSTMENT
 # ============================================================
-
 
 class StockAdjustView(APIView):
     """POST /api/v1/menu/stock/adjust/
@@ -230,3 +276,91 @@ class StockMovementListView(generics.ListAPIView):
         if ingredient_id:
             qs = qs.filter(ingredient_id=ingredient_id)
         return qs
+
+
+# ============================================================
+# LOW STOCK CHECK
+# ============================================================
+
+
+class LowStockCheckView(APIView):
+    """POST /api/v1/menu/stock/check-low/
+
+    Check for low stock ingredients and optionally send push alerts.
+    Manager/Superuser only.
+    """
+
+    permission_classes = [IsSuperUserOrManager]
+
+    def get(self, request):
+        """GET returns the list of low stock items without sending alerts."""
+        from django.db.models import F
+
+        items = Ingredient.objects.filter(
+            is_active=True,
+            current_stock__lte=F("minimum_stock"),
+        ).order_by("name")
+
+        data = [
+            {
+                "id": item.id,
+                "name": item.name,
+                "current_stock": str(item.current_stock),
+                "minimum_stock": str(item.minimum_stock),
+                "unit": item.unit,
+                "is_out_of_stock": item.current_stock == 0,
+            }
+            for item in items
+        ]
+
+        return Response(
+            {
+                "success": True,
+                "message": f"{len(data)} items below minimum stock.",
+                "data": data,
+            },
+            status=status.HTTP_200_OK,
+        )
+
+    def post(self, request):
+        """POST checks low stock AND sends push notifications to managers."""
+        from core.management.commands.check_low_stock import (
+            get_low_stock_items,
+            send_low_stock_alerts,
+        )
+
+        items = get_low_stock_items()
+
+        if not items:
+            return Response(
+                {
+                    "success": True,
+                    "message": "All ingredients are adequately stocked.",
+                    "data": [],
+                },
+                status=status.HTTP_200_OK,
+            )
+
+        result = send_low_stock_alerts(items)
+
+        return Response(
+            {
+                "success": True,
+                "message": f"Low stock alert sent for {result['items']} items.",
+                "data": {
+                    "items": [
+                        {
+                            "id": item.id,
+                            "name": item.name,
+                            "current_stock": str(item.current_stock),
+                            "minimum_stock": str(item.minimum_stock),
+                            "unit": item.unit,
+                        }
+                        for item in items
+                    ],
+                    "sent": result["sent"],
+                    "failed": result["failed"],
+                },
+            },
+            status=status.HTTP_200_OK,
+        )

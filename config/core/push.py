@@ -42,16 +42,14 @@ def send_push_notification(token, title, body, data=None, sound=True, priority="
         "to": token,
         "title": title,
         "body": body,
-        "sound": sound,
         "priority": priority,
     }
 
     if data:
         payload["data"] = data
 
+    # Expo Push API expects sound as a string or omitted (not boolean).
     # Custom sound bundled via the expo-notifications plugin.
-    # On Android a notification channel is required for sound to play;
-    # the app registers the "order-ready" channel with order_ready.mp3.
     if sound:
         payload["sound"] = "order_ready.mp3"
         payload["channelId"] = "order-ready"

@@ -389,3 +389,52 @@ class ExpenseSummaryView(APIView):
                 "data": {"total": str(total), "count": qs.count()},
             }
         )
+
+
+# ============================================================
+# DAILY SUMMARY TRIGGER
+# ============================================================
+
+
+class DailySummaryTriggerView(APIView):
+    """POST /api/v1/reports/daily-summary/trigger/
+
+    On-demand trigger for the daily sales summary push notification.
+    Superuser only.
+    """
+
+    permission_classes = [IsSuperUserOrManager]
+
+    def post(self, request):
+        from core.management.commands.daily_sales_summary import (
+            build_summary_data,
+            send_summary_to_managers,
+            format_summary_message,
+        )
+
+        data = build_summary_data()
+
+        if request.data.get("dry_run"):
+            return Response(
+                {
+                    "success": True,
+                    "message": "Dry run — no notifications sent.",
+                    "data": data,
+                },
+                status=status.HTTP_200_OK,
+            )
+
+        result = send_summary_to_managers(data)
+
+        return Response(
+            {
+                "success": True,
+                "message": f"Daily summary sent to {result['sent']} devices.",
+                "data": {
+                    "summary": data,
+                    "sent": result["sent"],
+                    "failed": result["failed"],
+                },
+            },
+            status=status.HTTP_200_OK,
+        )

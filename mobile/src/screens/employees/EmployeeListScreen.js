@@ -101,6 +101,15 @@ export default function EmployeeListScreen({ navigation }) {
           </View>
         }
       />
+
+      {/* Add employee — replaces adding via the web admin panel */}
+      <TouchableOpacity
+        style={styles.fab}
+        onPress={() => navigation.navigate('AddEmployee')}
+        activeOpacity={0.85}
+      >
+        <Ionicons name="person-add" size={24} color="#fff" />
+      </TouchableOpacity>
     </View>
   );
 }
@@ -127,4 +136,10 @@ const styles = StyleSheet.create({
   activeStatus: { fontSize: 12, fontWeight: '500' },
   empty: { alignItems: 'center', paddingTop: 60 },
   emptyText: { color: COLORS.textMuted, fontSize: 16, marginTop: 12 },
+  fab: {
+    position: 'absolute', right: 20, bottom: 20,
+    width: 56, height: 56, borderRadius: 28,
+    backgroundColor: COLORS.primary, justifyContent: 'center',
+    alignItems: 'center',
+  },
 });

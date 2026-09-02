@@ -24,6 +24,7 @@ import SeatingScreen from '../screens/orders/SeatingScreen';
 // Menu
 import MenuScreen from '../screens/menu/MenuScreen';
 import AddMenuItemScreen from '../screens/menu/AddMenuItemScreen';
+import StockInScreen from '../screens/menu/StockInScreen';
 
 // More
 import MoreScreen from '../screens/more/MoreScreen';
@@ -34,6 +35,7 @@ import ReportScreen from '../screens/reports/ReportScreen';
 import ExpensesScreen from '../screens/reports/ExpensesScreen';
 import EmployeeListScreen from '../screens/employees/EmployeeListScreen';
 import EmployeeDetailScreen from '../screens/employees/EmployeeDetailScreen';
+import AddEmployeeScreen from '../screens/employees/AddEmployeeScreen';
 import ProfileScreen from '../screens/profile/ProfileScreen';
 
 // Notifications
@@ -71,6 +73,8 @@ function HomeStack() {
       ) : (
         <Stack.Screen name="HomeHome" component={DashboardScreen} options={{ headerShown: false }} />
       )}
+      {/* Reachable from the dashboard bell icon */}
+      <Stack.Screen name="Notifications" component={NotificationsScreen} options={{ title: 'Notifications' }} />
     </Stack.Navigator>
   );
 }
@@ -123,6 +127,7 @@ function MenuStack() {
     <Stack.Navigator screenOptions={defaultScreenOptions}>
       <Stack.Screen name="MenuHome" component={MenuScreen} options={{ title: 'Menu' }} />
       <Stack.Screen name="AddMenuItem" component={AddMenuItemScreen} options={{ title: 'Add Menu Item' }} />
+      <Stack.Screen name="StockIn" component={StockInScreen} options={{ title: 'Stock In' }} />
     </Stack.Navigator>
   );
 }
@@ -138,6 +143,7 @@ function MoreStack() {
       <Stack.Screen name="Expenses" component={ExpensesScreen} options={{ title: 'Expenses' }} />
       <Stack.Screen name="Employees" component={EmployeeListScreen} options={{ title: 'Employees' }} />
       <Stack.Screen name="EmployeeDetail" component={EmployeeDetailScreen} options={{ title: 'Employee' }} />
+      <Stack.Screen name="AddEmployee" component={AddEmployeeScreen} options={{ title: 'Add Employee' }} />
       <Stack.Screen name="Profile" component={ProfileScreen} options={{ title: 'Profile' }} />
       <Stack.Screen name="Notifications" component={NotificationsScreen} options={{ title: 'Notifications' }} />
     </Stack.Navigator>

@@ -190,6 +190,9 @@ def create_order_batch(
                 f"{menu_item.name} is unavailable."
             )
 
+        # Validate stock availability for this menu item
+        _validate_stock(menu_item, quantity)
+
         OrderItem.objects.create(
             batch=batch,
             menu_item=menu_item,
@@ -500,6 +503,58 @@ def add_items_to_order(order, items, user=None, request=None):
     )
 
     return batch
+
+
+# ============================================================
+# STOCK VALIDATION
+# ============================================================
+
+def _validate_stock(menu_item, quantity):
+    """Check if there is enough stock to make this menu item.
+
+    Raises ValueError if any ingredient is below the required amount.
+    This prevents orders that would push stock negative.
+    """
+    from menu.models import Ingredient, RecipeItem
+    from django.db.models import F
+
+    recipes = RecipeItem.objects.filter(menu_item=menu_item).select_related("ingredient")
+
+    for recipe in recipes:
+        required = recipe.quantity * quantity
+        ingredient = recipe.ingredient
+        # Re-fetch current stock to avoid stale reads
+        ingredient.refresh_from_db(fields=["current_stock"])
+        if ingredient.current_stock < required:
+            raise ValueError(
+                f"Not enough {ingredient.name} for {quantity}x {menu_item.name}. "
+                f"Need {required} {ingredient.unit}, "
+                f"have {ingredient.current_stock} {ingredient.unit}."
+            )
+
+
+def check_stock_for_menu_item(menu_item, quantity=1):
+    """Return a list of ingredient stock info for a menu item.
+
+    Used by the API to show availability before ordering.
+    """
+    from menu.models import RecipeItem
+
+    recipes = RecipeItem.objects.filter(menu_item=menu_item).select_related("ingredient")
+    result = []
+
+    for recipe in recipes:
+        ingredient = recipe.ingredient
+        required = recipe.quantity * quantity
+        result.append({
+            "ingredient": ingredient.name,
+            "required": str(required),
+            "available": str(ingredient.current_stock),
+            "unit": ingredient.unit,
+            "sufficient": ingredient.current_stock >= required,
+        })
+
+    return result
 
 
 # ============================================================
