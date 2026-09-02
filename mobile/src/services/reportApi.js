@@ -8,4 +8,6 @@ export const reportApi = {
   getExpenses: (params = {}) => api.get(`${PREFIX}/expenses/`, params),
   createExpense: (data) => api.post(`${PREFIX}/expenses/`, data),
   getExpenseSummary: (params = {}) => api.get(`${PREFIX}/expenses/summary/`, params),
+  triggerDailySummary: (dryRun = false) =>
+    api.post(`${PREFIX}/daily-summary/trigger/`, { dry_run: dryRun }),
 };

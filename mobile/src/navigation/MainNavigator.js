@@ -32,6 +32,7 @@ import KitchenScreen from '../screens/kitchen/KitchenScreen';
 import DeliveryListScreen from '../screens/delivery/DeliveryListScreen';
 import CreateDeliveryOrderScreen from '../screens/delivery/CreateDeliveryOrderScreen';
 import ReportScreen from '../screens/reports/ReportScreen';
+import DailySummaryScreen from '../screens/reports/DailySummaryScreen';
 import ExpensesScreen from '../screens/reports/ExpensesScreen';
 import EmployeeListScreen from '../screens/employees/EmployeeListScreen';
 import EmployeeDetailScreen from '../screens/employees/EmployeeDetailScreen';
@@ -139,6 +140,7 @@ function MoreStack() {
       <Stack.Screen name="Kitchen" component={KitchenScreen} options={{ title: 'Kitchen Display' }} />
       <Stack.Screen name="Delivery" component={DeliveryListScreen} options={{ title: 'Delivery' }} />
       <Stack.Screen name="CreateDeliveryOrder" component={CreateDeliveryOrderScreen} options={{ title: 'New Delivery Order' }} />
+      <Stack.Screen name="DailySummary" component={DailySummaryScreen} options={{ title: 'Daily Summary' }} />
       <Stack.Screen name="Reports" component={ReportScreen} options={{ title: 'Sales Reports' }} />
       <Stack.Screen name="Expenses" component={ExpensesScreen} options={{ title: 'Expenses' }} />
       <Stack.Screen name="Employees" component={EmployeeListScreen} options={{ title: 'Employees' }} />
