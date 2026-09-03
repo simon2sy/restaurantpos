@@ -24,7 +24,6 @@ import SeatingScreen from '../screens/orders/SeatingScreen';
 // Menu
 import MenuScreen from '../screens/menu/MenuScreen';
 import AddMenuItemScreen from '../screens/menu/AddMenuItemScreen';
-import StockInScreen from '../screens/menu/StockInScreen';
 
 // More
 import MoreScreen from '../screens/more/MoreScreen';
@@ -128,7 +127,6 @@ function MenuStack() {
     <Stack.Navigator screenOptions={defaultScreenOptions}>
       <Stack.Screen name="MenuHome" component={MenuScreen} options={{ title: 'Menu' }} />
       <Stack.Screen name="AddMenuItem" component={AddMenuItemScreen} options={{ title: 'Add Menu Item' }} />
-      <Stack.Screen name="StockIn" component={StockInScreen} options={{ title: 'Stock In' }} />
     </Stack.Navigator>
   );
 }

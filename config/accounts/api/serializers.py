@@ -262,6 +262,8 @@ class PasswordChangeSerializer(serializers.Serializer):
         user = self.context["request"].user
         user.set_password(self.validated_data["new_password"])
         user.save()
-        # Flush session
-        self.context["request"].session.flush()
+        # Flush session if one exists (JWT-only requests have no session)
+        session = getattr(self.context["request"], "session", None)
+        if session:
+            session.flush()
         return user
