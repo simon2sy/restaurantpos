@@ -1,58 +1,98 @@
 import { useEffect, useRef } from 'react';
+import { AppState } from 'react-native';
+
+import { realtimeApi } from '../services/realtimeApi';
+
+const DEFAULT_INTERVAL_MS = 3000;
+const MAX_BACKOFF_MS = 15000;
 
 /**
- * useRealtime — opens a WebSocket to the Django Channels endpoint and invokes
- * `onMessage` for every message received. Reconnects automatically and cleans up
- * on unmount.
+ * useRealtime — HTTP-polling replacement for the WebSocket transport.
  *
- * @param {string|null} url  Full WS url (e.g. `${WS_BASE_URL}/kitchen/`) or null to disable
- * @param {(data: object) => void} onMessage  Called with parsed JSON for each frame
+ * Polls GET /api/v1/realtime/pulse/ on an interval and invokes `onMessage`
+ * with the same message shapes the Django Channels consumers used to send:
+ *   - 'kitchen'   → { type: 'new_order' } / { type: 'batch_status' } on change
+ *   - 'dashboard' → { type: 'stats_updated', reason }
+ *   - 'waiters'   → { type: 'order_ready', order_number, table, cabin,
+ *                     delivery, ready_at } per new notification
+ *
+ * Safeguards: skips a tick while the previous request is in-flight,
+ * backs off on errors, pauses while the app is backgrounded, and cleans
+ * up on unmount.
+ *
+ * @param {string|null} stream  'kitchen' | 'waiters' | 'dashboard' (null disables)
+ * @param {(data: object) => void} onMessage
+ * @param {{ intervalMs?: number }} [options]
  */
-export default function useRealtime(url, onMessage) {
+export default function useRealtime(stream, onMessage, { intervalMs = DEFAULT_INTERVAL_MS } = {}) {
   const onMessageRef = useRef(onMessage);
   onMessageRef.current = onMessage;
 
   useEffect(() => {
-    if (!url) return undefined;
+    if (!stream) return undefined;
 
-    let ws;
     let closed = false;
-    let retryTimer;
+    let inFlight = false;
+    let timer = null;
+    let since = null; // server-provided cursor
+    let backoffMs = 0;
+    let appActive = true;
+    let appStateSub = null;
 
-    const connect = () => {
+    const tick = async () => {
+      if (closed || inFlight) return;
+      inFlight = true;
       try {
-        ws = new WebSocket(url);
-      } catch {
-        retryTimer = setTimeout(connect, 3000);
-        return;
-      }
+        const res = await realtimeApi.pulse(since, stream);
+        const data = res?.data ?? res;
 
-      ws.onopen = () => {};
+        if (data?.now) since = data.now;
 
-      ws.onmessage = (event) => {
-        try {
-          const data = JSON.parse(event.data);
-          onMessageRef.current?.(data);
-        } catch {
-          // ignore malformed frames
+        // Replay concrete events (waiters order-ready payloads etc.)
+        if (Array.isArray(data?.events)) {
+          for (const ev of data.events) {
+            onMessageRef.current?.(ev);
+          }
         }
-      };
 
-      ws.onclose = () => {
-        if (!closed) retryTimer = setTimeout(connect, 3000);
-      };
+        // Surface stream-level change flags as synthetic messages that
+        // mirror the old WebSocket frame types, so screens just refetch.
+        const section = data?.[stream];
+        if (section?.changed) {
+          if (stream === 'kitchen') {
+            onMessageRef.current?.({ type: 'batch_status' });
+          } else if (stream === 'dashboard') {
+            onMessageRef.current?.({ type: 'stats_updated', reason: 'poll' });
+          }
+        }
 
-      ws.onerror = () => {
-        try { ws.close(); } catch { /* noop */ }
-      };
+        backoffMs = 0; // success — reset backoff
+      } catch {
+        // Network/server hiccup — back off before retrying.
+        backoffMs = Math.min(backoffMs + intervalMs, MAX_BACKOFF_MS);
+      }
     };
 
-    connect();
+    const run = async () => {
+      await tick();
+      if (!closed) {
+        timer = setTimeout(run, intervalMs + backoffMs);
+      }
+    };
+
+    // Pause while backgrounded to save battery/data; catch up on resume.
+    appStateSub = AppState.addEventListener('change', (state) => {
+      const wasActive = appActive;
+      appActive = state === 'active' || state === 'foreground';
+      if (appActive && !wasActive) run();
+    });
+
+    run();
 
     return () => {
       closed = true;
-      clearTimeout(retryTimer);
-      try { ws?.close(); } catch { /* noop */ }
+      clearTimeout(timer);
+      appStateSub?.remove?.();
     };
-  }, [url]);
+  }, [stream, intervalMs]);
 }

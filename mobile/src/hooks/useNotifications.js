@@ -1,6 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { notificationApi } from '../services/notificationApi';
-import { WS_BASE_URL } from '../constants/config';
 
 /**
  * useNotifications — keeps a live count of undismissed order-ready
@@ -13,7 +12,6 @@ import { WS_BASE_URL } from '../constants/config';
  */
 export default function useNotifications() {
   const [count, setCount] = useState(0);
-  const wsRef = useRef(null);
   const closedRef = useRef(false);
   const retryRef = useRef(null);
 
@@ -32,49 +30,49 @@ export default function useNotifications() {
     refresh();
   }, [refresh]);
 
-  // WebSocket listener
+  // Polling listener (replaces the WebSocket — works on WSGI-only hosts).
+  // Also pauses while the app is backgrounded and backs off on errors.
   useEffect(() => {
     closedRef.current = false;
+    let inFlight = false;
+    let timer;
+    let backoffMs = 0;
+    const INTERVAL_MS = 4000;
 
-    const connect = () => {
-      if (closedRef.current) return;
-
+    const tick = async () => {
+      if (closedRef.current || inFlight) return;
+      inFlight = true;
       try {
-        const ws = new WebSocket(`${WS_BASE_URL}/waiters/`);
-        wsRef.current = ws;
-
-        ws.onmessage = (event) => {
-          try {
-            const msg = JSON.parse(event.data);
-            if (msg.type === 'order_ready') {
-              // Bump the count immediately (optimistic)
-              setCount((c) => c + 1);
-            }
-          } catch {
-            // ignore malformed frames
-          }
-        };
-
-        ws.onclose = () => {
-          if (!closedRef.current) {
-            retryRef.current = setTimeout(connect, 3000);
-          }
-        };
-
-        ws.onerror = () => {
-          try { ws.close(); } catch { /* noop */ }
-        };
+        await refresh();
+        backoffMs = 0;
       } catch {
-        retryRef.current = setTimeout(connect, 3000);
+        backoffMs = Math.min(backoffMs + INTERVAL_MS, 15000);
+      } finally {
+        inFlight = false;
       }
     };
 
-    connect();
+    const run = async () => {
+      await tick();
+      if (!closedRef.current) retryRef.current = setTimeout(run, INTERVAL_MS + backoffMs);
+    };
+
+    let appStateSub = null;
+    try {
+      const { AppState } = require('react-native');
+      appStateSub = AppState.addEventListener('change', (state) => {
+        if (state === 'active' || state === 'foreground') run();
+      });
+    } catch {
+      // react-native unavailable in some test environments — ignore
+    }
+
+    run();
 
     return () => {
       closedRef.current = true;
       clearTimeout(retryRef.current);
-      try { wsRef.current?.close(); } catch { /* noop */ }
+      appStateSub?.remove?.();
     };
   }, []);
 

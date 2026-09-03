@@ -352,6 +352,8 @@ REST_FRAMEWORK = {
     "DEFAULT_THROTTLE_RATES": {
         "anon": "100/hour",
         "user": "1000/hour",
+        # Realtime pulse endpoint polled every ~3s per client (~1200/hour)
+        "pulse": "6000/hour",
         "login": "10/min",
     },
     "EXCEPTION_HANDLER": "core.exceptions.custom_exception_handler",

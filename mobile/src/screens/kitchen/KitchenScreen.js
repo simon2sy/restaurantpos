@@ -10,7 +10,6 @@ import { kitchenApi } from '../../services/kitchenApi';
 import LoadingSpinner from '../../components/LoadingSpinner';
 import ErrorView from '../../components/ErrorView';
 import { toList } from '../../utils/data';
-import { WS_BASE_URL } from '../../constants/config';
 import useRealtime from '../../hooks/useRealtime';
 
 const STATUS_META = {
@@ -125,7 +124,7 @@ export default function KitchenScreen() {
 
   // Live updates - when a waiter confirms an order or a batch status changes,
   // refetch immediately so the kitchen stays in real time.
-  useRealtime(`${WS_BASE_URL}/kitchen/`, (msg) => {
+  useRealtime('kitchen', (msg) => {
     if (msg && (msg.type === 'new_order' || msg.type === 'batch_status')) {
       fetchBatches();
     }

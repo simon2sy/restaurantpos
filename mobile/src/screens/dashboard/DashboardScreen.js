@@ -11,7 +11,6 @@ import { reportApi } from '../../services/reportApi';
 import LoadingSpinner from '../../components/LoadingSpinner';
 import ErrorView from '../../components/ErrorView';
 import { toObject } from '../../utils/data';
-import { WS_BASE_URL } from '../../constants/config';
 import useRealtime from '../../hooks/useRealtime';
 import { notificationApi } from '../../services/notificationApi';
 import * as Notifications from 'expo-notifications';
@@ -107,7 +106,7 @@ export default function DashboardScreen({ navigation }) {
 
   // Listen for real-time dashboard pings (order/payment/expense changes)
   // and refetch stats automatically — no manual pull-to-refresh needed.
-  useRealtime(`${WS_BASE_URL}/dashboard/`, (msg) => {
+  useRealtime('dashboard', (msg) => {
     if (msg && msg.type === 'stats_updated') {
       fetchData(period);
     }
@@ -216,7 +215,7 @@ export default function DashboardScreen({ navigation }) {
 
   // Live "food ready" notifications pushed to waiters by the kitchen.
   // An `order_served` event removes the order from the banner.
-  useRealtime(`${WS_BASE_URL}/waiters/`, (msg) => {
+  useRealtime('waiters', (msg) => {
     if (msg && msg.type === 'order_ready') {
       setReadyOrders((prev) =>
         prev.some((o) => o.order_number === msg.order_number)
