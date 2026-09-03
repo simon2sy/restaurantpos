@@ -5,6 +5,7 @@ import { realtimeApi } from '../services/realtimeApi';
 
 const DEFAULT_INTERVAL_MS = 3000;
 const MAX_BACKOFF_MS = 15000;
+const HEARTBEAT_MS = 10000; // force a refetch this often even if no change flagged
 
 /**
  * useRealtime — HTTP-polling replacement for the WebSocket transport.
@@ -38,6 +39,7 @@ export default function useRealtime(stream, onMessage, { intervalMs = DEFAULT_IN
     let backoffMs = 0;
     let appActive = true;
     let appStateSub = null;
+    let lastHeartbeatAt = null;
 
     const tick = async () => {
       if (closed || inFlight) return;
@@ -63,6 +65,21 @@ export default function useRealtime(stream, onMessage, { intervalMs = DEFAULT_IN
             onMessageRef.current?.({ type: 'batch_status' });
           } else if (stream === 'dashboard') {
             onMessageRef.current?.({ type: 'stats_updated', reason: 'poll' });
+          }
+        }
+
+        // Self-healing heartbeat — even if a change is ever missed by the
+        // cursor or a transient blip, force a refetch at most every HEARTBEAT_MS
+        // so screens never require a manual pull-to-refresh.
+
+        const nowMs = Date.now();
+        if (nowMs - (lastHeartbeatAt ?? 0) >= HEARTBEAT_MS) {
+
+          lastHeartbeatAt = = nowMs;
+          if (stream === 'kitchen') {
+            onMessageRef.current?.({ type: 'batch_status' });
+          } else if (stream === 'dashboard') {
+            onMessageRef.current?.({ type: 'stats_updated', reason: 'heartbeat' });
           }
         }
 
