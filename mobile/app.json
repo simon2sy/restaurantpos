@@ -49,8 +49,9 @@
     ],
     "extra": {
       "eas": {
-        "projectId": "ffdb4522-486b-4552-8e26-99d3fc96e01e"
+        "projectId": "fb0945ae-1f3f-478f-afa5-06a6f075ee02"
       }
-    }
+    },
+    "owner": "simonstha"
   }
 }

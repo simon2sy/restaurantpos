@@ -14,8 +14,14 @@ import { PushNotificationProvider } from './src/context/PushNotificationProvider
 SplashScreen.preventAutoHideAsync().catch(() => {});
 
 export default function App() {
+  // Load Ionicons from the project-local copy (assets/fonts/ionicons.ttf)
+  // rather than the node_modules copy. On Android release builds the
+  // @expo/vector-icons fonts inside node_modules are NOT embedded into the
+  // APK, which makes every <Ionicons> render blank. Referencing the local
+  // asset guarantees Metro bundles the font into release builds.
   const [fontsLoaded, fontError] = useFonts({
     ...Ionicons.font,
+    ionicons: require('./assets/fonts/ionicons.ttf'),
   });
 
   const ready = fontsLoaded || !!fontError;

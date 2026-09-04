@@ -75,7 +75,7 @@ export default function useRealtime(stream, onMessage, { intervalMs = DEFAULT_IN
         const nowMs = Date.now();
         if (nowMs - (lastHeartbeatAt ?? 0) >= HEARTBEAT_MS) {
 
-          lastHeartbeatAt = = nowMs;
+          lastHeartbeatAt = nowMs;
           if (stream === 'kitchen') {
             onMessageRef.current?.({ type: 'batch_status' });
           } else if (stream === 'dashboard') {
