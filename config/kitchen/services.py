@@ -1,4 +1,4 @@
-from django.utils import timezone
+﻿from django.utils import timezone
 from asgiref.sync import async_to_sync
 from channels.layers import get_channel_layer
 from orders.models import Order, OrderBatch
@@ -76,7 +76,7 @@ def notify_waiters_ready(batch):
 
     # --- Build human-readable message ---
     if delivery:
-        location = f"Delivery → {delivery.customer_name}"
+        location = f"Delivery â†’ {delivery.customer_name}"
     elif table_num:
         location = f"Table {table_num}"
     elif cabin_num:
@@ -125,12 +125,39 @@ def notify_waiters_ready(batch):
             },
         )
 
-    # --- FCM push notification to all waiters (best-effort) ---
+    # --- FCM push notification to all waiters, cashiers, and managers (best-effort) ---
     try:
         from core.push import send_push_to_role
+        # Notify waiters
         send_push_to_role(
             role="WAITER",
-            title="🍽️ Order Ready!",
+            title="ðŸ½ï¸ Order Ready!",
+            body=message,
+            data={
+                "type": "order_ready",
+                "order_id": order.id,
+                "order_number": order.order_number,
+                "batch_id": batch.id,
+            },
+            sound=True,
+        )
+        # Notify cashiers (they also handle orders)
+        send_push_to_role(
+            role="CASHIER",
+            title="ðŸ½ï¸ Order Ready!",
+            body=message,
+            data={
+                "type": "order_ready",
+                "order_id": order.id,
+                "order_number": order.order_number,
+                "batch_id": batch.id,
+            },
+            sound=True,
+        )
+        # Notify managers
+        send_push_to_role(
+            role="MANAGER",
+            title="ðŸ½ï¸ Order Ready!",
             body=message,
             data={
                 "type": "order_ready",
@@ -214,14 +241,14 @@ def notify_kitchen(batch):
         },
     )
 
-    # --- FCM push notification to all kitchen staff (best-effort) ---
+    # --- FCM push notification to all kitchen staff and managers (best-effort) ---
     try:
         from core.push import send_push_to_role
 
         table_num = batch.order.table.number if batch.order.table_id else None
         cabin_num = batch.order.cabin.number if batch.order.cabin_id else None
         if delivery_info:
-            location = f"Delivery → {delivery_info['customer_name']}"
+            location = f"Delivery â\u2192 {delivery_info['customer_name']}"
         elif table_num:
             location = f"Table {table_num}"
         elif cabin_num:
@@ -235,9 +262,23 @@ def notify_kitchen(batch):
         if len(items) > 3:
             items_text += f" +{len(items) - 3} more"
 
+        # Notify kitchen staff
         send_push_to_role(
             role="KITCHEN",
-            title=f"🔥 New Order #{batch.order.order_number}",
+            title=f"ðŸ\u201d¥ New Order #{batch.order.order_number}",
+            body=f"{location}: {items_text}",
+            data={
+                "type": "new_order",
+                "order_id": order.id,
+                "order_number": order.order_number,
+                "batch_id": batch.id,
+            },
+            sound=True,
+        )
+        # Also notify managers
+        send_push_to_role(
+            role="MANAGER",
+            title=f"ðŸ\u201d¥ New Order #{batch.order.order_number}",
             body=f"{location}: {items_text}",
             data={
                 "type": "new_order",
@@ -270,3 +311,5 @@ def notify_batch_status(batch):
             "status": batch.status,
         },
     )
+
+

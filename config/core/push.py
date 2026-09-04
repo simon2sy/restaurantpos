@@ -29,7 +29,7 @@ def send_push_notification(token, title, body, data=None, sound=True, priority="
         title: Notification title
         body: Notification body text
         data: Optional dict of custom data passed to the app
-        sound: Whether to play a sound (default True)
+        sound: Whether to play a sound (default True) - can be boolean or string sound filename
         priority: Push priority — "high" for order alerts, "default" otherwise
 
     Returns:
@@ -51,8 +51,18 @@ def send_push_notification(token, title, body, data=None, sound=True, priority="
     # Expo Push API expects sound as a string or omitted (not boolean).
     # Custom sound bundled via the expo-notifications plugin.
     if sound:
-        payload["sound"] = "order_ready.mp3"
-        payload["channelId"] = "order-ready"
+        # Determine sound file and channel based on notification type
+        notification_type = data.get("type") if data else None
+        if notification_type == "payment_received":
+            payload["sound"] = "payment_done.mp3"
+            payload["channelId"] = "general"
+        elif notification_type == "new_order":
+            payload["sound"] = "order_received.mp3"
+            payload["channelId"] = "general"
+        else:
+            # Default sound for order_ready and other notifications
+            payload["sound"] = "order_ready.mp3"
+            payload["channelId"] = "order-ready"
 
     try:
         response = requests.post(

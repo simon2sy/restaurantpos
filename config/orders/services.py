@@ -361,6 +361,65 @@ def complete_payment(
         request=request,
     )
 
+    # --------------------------------------------------------
+    # PUSH NOTIFICATION TO ADMIN/MANAGER
+    # --------------------------------------------------------
+    # Send push notification to all admin/manager users so they receive
+    # real-time payment alerts on their devices.
+    try:
+        from core.push import send_push_to_users
+        from accounts.models import EmployeeProfile
+        from django.contrib.auth.models import User
+
+        # Get all active manager users
+        manager_profiles = EmployeeProfile.objects.filter(
+            role__in=[EmployeeProfile.Role.MANAGER],
+            is_active=True,
+        ).select_related("user")
+
+        manager_users = [profile.user for profile in manager_profiles]
+
+        # Also include superusers
+        superusers = User.objects.filter(is_superuser=True, is_active=True)
+
+        # Combine and deduplicate
+        notify_users = list(set(manager_users + list(superusers)))
+
+        if notify_users:
+            # Get payer name
+            payer_name = "Unknown"
+            if user:
+                payer_name = user.get_full_name() or user.username
+
+            # Get order location info
+            location = ""
+            if order.table:
+                location = f"Table {order.table.number}"
+            elif order.cabin:
+                location = f"Cabin {order.cabin.number}"
+            elif hasattr(order, 'delivery') and order.delivery:
+                location = f"Delivery - {order.delivery.customer_name}"
+
+            send_push_to_users(
+                users=notify_users,
+                title=f"💵 Payment Received - Order #{order.order_number}",
+                body=f"Rs. {order.total} via {payment_method} at {location} (by {payer_name})",
+                data={
+                    "type": "payment_received",
+                    "order_id": order.id,
+                    "order_number": order.order_number,
+                    "payment_method": payment_method,
+                    "total": str(order.total),
+                    "payer_name": payer_name,
+                },
+                sound=True,
+            )
+    except Exception as e:
+        # Push notifications are best-effort; never block payment flow.
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.warning(f"Failed to send payment notification: {e}")
+
     return order
 # ============================================================
 # ORDER STATUS ENGINE
