@@ -36,8 +36,17 @@ export default function PaymentScreen({ route, navigation }) {
         },
         trigger: null,
       }).catch(() => {});
+      
+      // Navigate to home screen after successful payment
+      // This ensures the order list is refreshed when user navigates back
       Alert.alert('Success', `Payment of Rs. ${total} completed!`, [
-        { text: 'OK', onPress: () => navigation.popToTop() },
+        { 
+          text: 'OK', 
+          onPress: () => {
+            // Navigate to the Home tab (first tab in the navigator)
+            navigation.navigate('Home');
+          }
+        },
       ]);
     } catch (err) {
       Alert.alert('Error', err.message || 'Payment failed.');

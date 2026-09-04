@@ -64,13 +64,17 @@ export async function registerForPushNotifications() {
 
   // Android needs a notification channel for custom sounds
   if (Platform.OS === 'android') {
-    // Delete the old channel first — Android freezes channel settings at
-    // creation, so re-creating it is the only way to apply a new sound
+    // Delete the old channels first — Android freezes channel settings at
+    // creation, so re-creating them is the only way to apply new sounds
     // on app updates.
     try {
       await Notifications.deleteNotificationChannelAsync('order-ready');
     } catch (e) { /* channel may not exist yet */ }
+    try {
+      await Notifications.deleteNotificationChannelAsync('general');
+    } catch (e) { /* channel may not exist yet */ }
 
+    // Channel for order ready notifications
     await Notifications.setNotificationChannelAsync('order-ready', {
       name: 'Order Ready',
       importance: Notifications.AndroidImportance.HIGH,
@@ -79,9 +83,12 @@ export async function registerForPushNotifications() {
       sound: 'order_ready.mp3',
     });
 
+    // Channel for general notifications (payment, new order)
     await Notifications.setNotificationChannelAsync('general', {
       name: 'General',
-      importance: Notifications.AndroidImportance.DEFAULT,
+      importance: Notifications.AndroidImportance.HIGH,
+      vibrationPattern: [0, 250, 250, 250],
+      lightColor: '#4f6ef7',
       sound: 'default',
     });
   }

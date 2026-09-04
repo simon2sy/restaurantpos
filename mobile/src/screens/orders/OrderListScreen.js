@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import {
   View, Text, FlatList, TouchableOpacity, StyleSheet, RefreshControl, Alert, ScrollView,
 } from 'react-native';
+import { useFocusEffect } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { COLORS, SPACING, RADIUS, SHADOW } from '../../constants/colors';
@@ -87,7 +88,11 @@ export default function OrderListScreen({ navigation }) {
   const [servedFilter, setServedFilter] = useState('all'); // 'all' | 'served' | 'not_served'
   const [paymentFilter, setPaymentFilter] = useState('all'); // 'all' | 'PAID' | 'UNPAID'
 
-  const fetchOrders = useCallback(async () => {
+  const fetchOrders = useCallback(async (showLoading = true) => {
+    if (showLoading) {
+      setLoading(true);
+    }
+    setError(null);
     try {
       const params = {};
       if (filter !== 'All') params.status = filter;
@@ -110,9 +115,19 @@ export default function OrderListScreen({ navigation }) {
     }
   }, [filter, dateFilter, servedFilter, paymentFilter]);
 
+  // Fetch orders on initial load
   useEffect(() => {
     fetchOrders();
   }, [fetchOrders]);
+
+  // Refresh orders when screen gains focus (e.g., after returning from payment)
+  useFocusEffect(
+    useCallback(() => {
+      // Refresh the order list without showing loading spinner
+      // This ensures the latest payment status is displayed
+      fetchOrders(false);
+    }, [fetchOrders])
+  );
 
   const onRefresh = () => {
     setRefreshing(true);

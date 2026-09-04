@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity, StyleSheet, RefreshControl, Alert,
 } from 'react-native';
+import { useFocusEffect } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { COLORS, SPACING, RADIUS } from '../../constants/colors';
 import { useAuth } from '../../context/AuthContext';
@@ -39,7 +40,11 @@ export default function OrderDetailScreen({ route, navigation }) {
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState(null);
 
-  const fetchOrder = useCallback(async () => {
+  const fetchOrder = useCallback(async (showLoading = true) => {
+    if (showLoading) {
+      setLoading(true);
+    }
+    setError(null);
     try {
       const response = await orderApi.getDetail(orderId);
       setOrder(response);
@@ -51,12 +56,19 @@ export default function OrderDetailScreen({ route, navigation }) {
     }
   }, [orderId]);
 
+  // Fetch order on initial load
   useEffect(() => {
-    setLoading(true);
-    setError(null);
-    setOrder(null);
     fetchOrder();
   }, [fetchOrder]);
+
+  // Refresh order when screen gains focus (e.g., after returning from payment)
+  useFocusEffect(
+    useCallback(() => {
+      // Refresh the order data without showing loading spinner
+      // This ensures the latest payment status is displayed
+      fetchOrder(false);
+    }, [fetchOrder])
+  );
 
   const onRefresh = () => {
     setRefreshing(true);

@@ -99,24 +99,34 @@ def send_push_to_users(users, title, body, data=None, sound=True):
     """
     from core.models import DeviceToken
 
+    # Convert to list if it's a QuerySet
+    users = list(users)
+    
     tokens = DeviceToken.objects.filter(
         user__in=users,
         is_active=True,
-    ).values_list("token", flat=True)
-
+    ).select_related("user")
+    
+    # Log for debugging
+    logger.info(f"Sending push notification '{title}' to {len(users)} users")
+    logger.info(f"Found {tokens.count()} active device tokens")
+    
     sent = 0
     failed = 0
 
-    for token in tokens:
-        result = send_push_notification(token, title, body, data=data, sound=sound)
+    for token_obj in tokens:
+        result = send_push_notification(token_obj.token, title, body, data=data, sound=sound)
         if result["status"] == "ok":
             sent += 1
+            logger.info(f"Push sent to {token_obj.user.username}: {title}")
         else:
             failed += 1
+            logger.warning(f"Push failed for {token_obj.user.username}: {result}")
             # If token is invalid, deactivate it
             if "DeviceNotRegistered" in str(result.get("message", "")):
-                DeviceToken.objects.filter(token=token).update(is_active=False)
+                DeviceToken.objects.filter(token=token_obj.token).update(is_active=False)
 
+    logger.info(f"Push notification results: {sent} sent, {failed} failed")
     return {"sent": sent, "failed": failed}
 
 
@@ -134,6 +144,7 @@ def send_push_to_role(role, title, body, data=None, sound=True):
         dict with 'sent' and 'failed' counts
     """
     from accounts.models import EmployeeProfile
+    from core.models import DeviceToken
 
     employees = EmployeeProfile.objects.filter(
         role=role,
@@ -141,5 +152,16 @@ def send_push_to_role(role, title, body, data=None, sound=True):
     ).select_related("user")
 
     users = [emp.user for emp in employees]
+    
+    # Log for debugging
+    logger.info(f"Sending push notification to role '{role}': {len(users)} users found")
+    
+    # Check which users have device tokens
+    users_with_tokens = DeviceToken.objects.filter(
+        user__in=users,
+        is_active=True,
+    ).values_list("user__username", flat=True)
+    
+    logger.info(f"Users with active device tokens for role '{role}': {list(users_with_tokens)}")
 
     return send_push_to_users(users, title, body, data=data, sound=sound)
