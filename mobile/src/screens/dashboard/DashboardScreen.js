@@ -7,11 +7,12 @@ import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { COLORS, SPACING, RADIUS, SHADOW } from '../../constants/colors';
 import { useAuth } from '../../context/AuthContext';
+import { useFocusEffect } from '@react-navigation/native';
 import { reportApi } from '../../services/reportApi';
 import LoadingSpinner from '../../components/LoadingSpinner';
 import ErrorView from '../../components/ErrorView';
 import { toObject } from '../../utils/data';
-import useRealtime from '../../hooks/useRealtime';
+import useWebSocket from '../../hooks/useWebSocket';
 import { notificationApi } from '../../services/notificationApi';
 import * as Notifications from 'expo-notifications';
 
@@ -104,13 +105,53 @@ export default function DashboardScreen({ navigation }) {
     fetchData();
   }, [fetchData]);
 
-  // Listen for real-time dashboard pings (order/payment/expense changes)
-  // and refetch stats automatically — no manual pull-to-refresh needed.
-  useRealtime('dashboard', (msg) => {
-    if (msg && msg.type === 'stats_updated') {
+  // Refresh the dashboard whenever the screen gains focus again (e.g. after
+  // a payment is completed elsewhere or the user returns to this tab).
+  useFocusEffect(
+    useCallback(() => {
+      fetchData(period);
+    }, [fetchData, period])
+  );
+
+  // Realtime updates via WebSocket — instant refresh without polling.
+  useWebSocket('dashboard', (msg) => {
+    if (!msg) return;
+    
+    if (msg.type === 'stats_updated') {
       fetchData(period);
     }
+    
+    // Handle real-time payment notifications
+    if (msg.type === 'payment_received') {
+      fetchData(period);
+      
+      // Show local notification for payment received
+      Notifications.scheduleNotificationAsync({
+        content: {
+          title: '💵 Payment Received',
+          body: msg.message || `Payment of Rs. ${msg.total} received via ${msg.payment_method}`,
+          sound: 'payment_done.mp3',
+          channelId: 'general',
+          data: {
+            type: 'payment_received',
+            order_id: msg.order_id,
+            order_number: msg.order_number,
+          },
+        },
+        trigger: null,
+      });
+    }
   });
+
+  // Reliable polling fallback — even if the WebSocket is unavailable/blocked,
+  // the dashboard still refreshes every few seconds so totals stay live.
+  useEffect(() => {
+    // Skip the very first interval tick (the initial fetch handles that).
+    const interval = setInterval(() => {
+      fetchData(period);
+    }, 10000); // every 10 seconds
+    return () => clearInterval(interval);
+  }, [fetchData, period]);
 
   const changePeriod = (p) => {
     setPeriod(p);
@@ -215,7 +256,7 @@ export default function DashboardScreen({ navigation }) {
 
   // Live "food ready" notifications pushed to waiters by the kitchen.
   // An `order_served` event removes the order from the banner.
-  useRealtime('waiters', (msg) => {
+  useWebSocket('waiters', (msg) => {
     if (msg && msg.type === 'order_ready') {
       setReadyOrders((prev) =>
         prev.some((o) => o.order_number === msg.order_number)

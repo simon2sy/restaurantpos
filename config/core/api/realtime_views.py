@@ -13,7 +13,7 @@ handles both transports identically.
 from django.utils import timezone
 from django.utils.dateparse import parse_datetime
 from rest_framework.response import Response
-from rest_framework.throttling import ScopedRateThrottle
+
 from rest_framework.views import APIView
 
 from core.api_permissions import IsAnyStaff
@@ -55,11 +55,6 @@ class RealtimePulseView(APIView):
     """
 
     permission_classes = [IsAnyStaff]
-    # Pulse requests are high-frequency by design; give them their own
-    # generous throttle scope instead of burning the global 1000/hour
-    # user budget (3s polling alone is 1200/hour).
-    throttle_classes = [ScopedRateThrottle]
-    throttle_scope = "pulse"
 
     def get(self, request):
         raw_since = request.query_params.get("since")

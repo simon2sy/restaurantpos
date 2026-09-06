@@ -97,7 +97,8 @@ class WaiterConsumer(AsyncWebsocketConsumer):
 
 class DashboardConsumer(AsyncWebsocketConsumer):
     """Pushes 'stats_updated' pings to admin dashboards whenever
-    orders / payments / expenses change, so the UI can refetch live."""
+    orders / payments / expenses change, so the UI can refetch live.
+    Also sends real-time payment notifications when payments are received."""
 
     async def connect(self):
         self.room_group_name = "dashboard"
@@ -112,5 +113,20 @@ class DashboardConsumer(AsyncWebsocketConsumer):
             text_data=json.dumps({
                 "type": "stats_updated",
                 "reason": event.get("reason", ""),
+            })
+        )
+
+    async def payment_received(self, event):
+        """Send real-time payment notification to dashboard."""
+        await self.send(
+            text_data=json.dumps({
+                "type": "payment_received",
+                "order_id": event.get("order_id"),
+                "order_number": event.get("order_number"),
+                "payment_method": event.get("payment_method"),
+                "total": event.get("total"),
+                "payer_name": event.get("payer_name"),
+                "location": event.get("location"),
+                "message": event.get("message"),
             })
         )

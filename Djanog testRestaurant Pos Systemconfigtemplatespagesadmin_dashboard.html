@@ -1,0 +1,86 @@
+
+{% block extra_js %}
+<script>
+// WebSocket Real-Time Dashboard Updates
+(function() {
+    let ws = null;
+    let reconnectTimer = null;
+    let reconnectDelay = 3000;
+    const maxReconnectDelay = 30000;
+    
+    function getAccessToken() {
+        return localStorage.getItem('access_token') || 
+               sessionStorage.getItem('access_token') ||
+               (document.cookie.match(/access_token=([^;]+)/) || [])[1];
+    }
+    
+    function connect() {
+        const token = getAccessToken();
+        const scheme = window.location.protocol === 'https:' ? 'wss' : 'ws';
+        const url = token 
+            ? `${scheme}://${window.location.host}/ws/dashboard/?token=${token}`
+            : `${scheme}://${window.location.host}/ws/dashboard/`;
+        
+        ws = new WebSocket(url);
+        
+        ws.onopen = () => { reconnectDelay = 3000; };
+        
+        ws.onmessage = (e) => {
+            try { handleMessage(JSON.parse(e.data)); } catch(err) {}
+        };
+        
+        ws.onclose = () => {
+            reconnectTimer = setTimeout(connect, reconnectDelay);
+            reconnectDelay = Math.min(reconnectDelay * 2, maxReconnectDelay);
+        };
+    }
+    
+    function handleMessage(data) {
+        if (data.type === 'payment_received') updateRevenue(data.total);
+        if (data.type === 'stats_updated') refreshStats();
+    }
+    
+    function updateRevenue(amount) {
+        const el = document.querySelector('.dash-metric-value');
+        if (!el) return;
+        const current = parseFloat(el.textContent.replace(/[Rs.,]/g, '')) || 0;
+        const target = current + parseFloat(amount || 0);
+        
+        const start = performance.now();
+        const animate = (now) => {
+            const progress = Math.min((now - start) / 1000, 1);
+            const val = current + (target - current) * (1 - Math.pow(1 - progress, 3));
+            el.textContent = 'Rs. ' + val.toLocaleString('en-IN', {maximumFractionDigits: 0});
+            if (progress < 1) requestAnimationFrame(animate);
+        };
+        requestAnimationFrame(animate);
+        
+        showToast(amount);
+    }
+    
+    function refreshStats() {
+        fetch('/api/v1/reports/dashboard-stats/', {credentials: 'same-origin'})
+            .then(r => r.json())
+            .then(data => {
+                const metrics = document.querySelectorAll('.dash-metric-value');
+                if (metrics[0] && data.revenue_today) metrics[0].textContent = 'Rs. ' + parseFloat(data.revenue_today).toLocaleString('en-IN');
+                if (metrics[1] && data.orders_today) metrics[1].textContent = data.orders_today;
+            }).catch(() => {});
+    }
+    
+    function showToast(amount) {
+        const t = document.createElement('div');
+        t.style.cssText = 'position:fixed;top:20px;right:20px;background:linear-gradient(135deg,#10b981,#059669);color:#fff;padding:16px 20px;border-radius:12px;box-shadow:0 10px 40px rgba(16,185,129,.3);z-index:9999;display:flex;align-items:center;gap:12px;animation:slideIn .3s';
+        t.innerHTML = '<span style="font-size:24px">??</span><span>Rs. ' + parseFloat(amount).toLocaleString('en-IN') + ' received!</span>';
+        document.body.appendChild(t);
+        setTimeout(() => { t.style.opacity='0'; t.style.transition='opacity .3s'; setTimeout(()=>t.remove(),300); }, 4000);
+    }
+    
+    const style = document.createElement('style');
+    style.textContent = '@keyframes slideIn{from{transform:translateX(100%);opacity:0}to{transform:translateX(0);opacity:1}}';
+    document.head.appendChild(style);
+    
+    document.addEventListener('DOMContentLoaded', connect);
+})();
+</script>
+{% endblock %}

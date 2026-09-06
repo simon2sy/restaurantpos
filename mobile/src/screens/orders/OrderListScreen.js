@@ -10,6 +10,7 @@ import { orderApi } from '../../services/orderApi';
 import LoadingSpinner from '../../components/LoadingSpinner';
 import ErrorView from '../../components/ErrorView';
 import { toList } from '../../utils/data';
+import useWebSocket from '../../hooks/useWebSocket';
 
 const STATUS_COLORS = {
   OPEN: COLORS.orderOpen,
@@ -120,6 +121,15 @@ export default function OrderListScreen({ navigation }) {
     fetchOrders();
   }, [fetchOrders]);
 
+  // Real-time updates via WebSocket
+  useWebSocket('dashboard', useCallback((msg) => {
+    if (!msg) return;
+    // Refresh orders when payment is received or stats are updated
+    if (msg.type === 'payment_received' || msg.type === 'stats_updated') {
+      fetchOrders(false);
+    }
+  }, [fetchOrders]));
+
   // Refresh orders when screen gains focus (e.g., after returning from payment)
   useFocusEffect(
     useCallback(() => {
@@ -128,6 +138,15 @@ export default function OrderListScreen({ navigation }) {
       fetchOrders(false);
     }, [fetchOrders])
   );
+
+  // Reliable polling fallback — keeps order list fresh even if WebSocket
+  // is unavailable in the network. Refreshes every 15 seconds.
+  useEffect(() => {
+    const interval = setInterval(() => {
+      fetchOrders(false);
+    }, 15000);
+    return () => clearInterval(interval);
+  }, [fetchOrders]);
 
   const onRefresh = () => {
     setRefreshing(true);

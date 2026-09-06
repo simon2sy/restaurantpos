@@ -37,16 +37,14 @@ export default function PaymentScreen({ route, navigation }) {
         trigger: null,
       }).catch(() => {});
       
-      // Navigate to home screen after successful payment
-      // This ensures the order list is refreshed when user navigates back
+      // ✅ Redirect to Home tab IMMEDIATELY on success — before showing the
+      // alert. This guarantees the waiter is never stuck on the payment page.
+      // Works for ALL roles (waiter, cashier, manager, admin).
+      navigation.navigate('Home');
+      
+      // Confirm success on the home screen.
       Alert.alert('Success', `Payment of Rs. ${total} completed!`, [
-        { 
-          text: 'OK', 
-          onPress: () => {
-            // Navigate to the Home tab (first tab in the navigator)
-            navigation.navigate('Home');
-          }
-        },
+        { text: 'OK' },
       ]);
     } catch (err) {
       Alert.alert('Error', err.message || 'Payment failed.');

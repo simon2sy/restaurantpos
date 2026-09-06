@@ -362,10 +362,57 @@ def complete_payment(
     )
 
     # --------------------------------------------------------
+    # WEBSOCKET NOTIFICATION TO DASHBOARD (real-time)
+    # --------------------------------------------------------
+    # Send real-time WebSocket notification to admin dashboard
+    # so the UI updates instantly without polling.
+    try:
+        from asgiref.sync import async_to_sync
+        from channels.layers import get_channel_layer
+
+        channel_layer = get_channel_layer()
+        if channel_layer is not None:
+            # Get payer name
+            payer_name = "Unknown"
+            if user:
+                payer_name = user.get_full_name() or user.username
+
+            # Get order location info
+            location = ""
+            if order.table:
+                location = f"Table {order.table.number}"
+            elif order.cabin:
+                location = f"Cabin {order.cabin.number}"
+            elif hasattr(order, 'delivery') and order.delivery:
+                location = f"Delivery - {order.delivery.customer_name}"
+
+            async_to_sync(channel_layer.group_send)(
+                "dashboard",
+                {
+                    "type": "payment_received",
+                    "order_id": order.id,
+                    "order_number": order.order_number,
+                    "payment_method": payment_method,
+                    "total": str(order.total),
+                    "payer_name": payer_name,
+                    "location": location,
+                    "message": f"Payment of Rs. {order.total} received via {payment_method} at {location} (by {payer_name})",
+                },
+            )
+    except Exception:
+        # WebSocket notification is best-effort; never block payment flow.
+        pass
+
+    # --------------------------------------------------------
     # PUSH NOTIFICATION TO ADMIN/MANAGER
     # --------------------------------------------------------
     # Send push notification to all admin/manager users so they receive
-    # real-time payment alerts on their devices.
+    # real-time payment alerts on their devices. This happens regardless
+    # of who initiates the payment (waiter, cashier, or manager).
+    import logging
+    logger = logging.getLogger(__name__)
+    logger.info(f"Attempting to send payment notification for Order #{order.order_number}")
+    
     try:
         from core.push import send_push_to_users
         from accounts.models import EmployeeProfile
@@ -378,12 +425,15 @@ def complete_payment(
         ).select_related("user")
 
         manager_users = [profile.user for profile in manager_profiles]
+        logger.info(f"Found {len(manager_users)} manager users")
 
         # Also include superusers
-        superusers = User.objects.filter(is_superuser=True, is_active=True)
+        superusers = list(User.objects.filter(is_superuser=True, is_active=True))
+        logger.info(f"Found {len(superusers)} superusers")
 
         # Combine and deduplicate
-        notify_users = list(set(manager_users + list(superusers)))
+        notify_users = list(set(manager_users + superusers))
+        logger.info(f"Total users to notify: {len(notify_users)}")
 
         if notify_users:
             # Get payer name
@@ -400,7 +450,8 @@ def complete_payment(
             elif hasattr(order, 'delivery') and order.delivery:
                 location = f"Delivery - {order.delivery.customer_name}"
 
-            send_push_to_users(
+            logger.info(f"Sending payment notification to {len(notify_users)} users: {payer_name} paid Rs. {order.total}")
+            result = send_push_to_users(
                 users=notify_users,
                 title=f"💵 Payment Received - Order #{order.order_number}",
                 body=f"Rs. {order.total} via {payment_method} at {location} (by {payer_name})",
@@ -414,11 +465,12 @@ def complete_payment(
                 },
                 sound=True,
             )
+            logger.info(f"Push notification result: {result}")
+        else:
+            logger.warning("No users to notify - no managers or superusers found")
     except Exception as e:
         # Push notifications are best-effort; never block payment flow.
-        import logging
-        logger = logging.getLogger(__name__)
-        logger.warning(f"Failed to send payment notification: {e}")
+        logger.error(f"Failed to send payment notification: {e}", exc_info=True)
 
     return order
 # ============================================================

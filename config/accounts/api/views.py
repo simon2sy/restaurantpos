@@ -3,7 +3,7 @@ from django.contrib.auth.models import User
 from rest_framework import generics, permissions, status
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.response import Response
-from rest_framework.throttling import AnonRateThrottle
+
 from rest_framework.views import APIView
 from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
@@ -37,7 +37,6 @@ class LoginView(APIView):
     """
 
     permission_classes = [permissions.AllowAny]
-    throttle_classes = [AnonRateThrottle]
 
     def post(self, request):
         # Cache import — wrapped so broken cache never blocks login
@@ -258,7 +257,6 @@ class CustomerRegisterAPIView(APIView):
     """POST /api/v1/auth/register/ — Public customer registration."""
 
     permission_classes = [permissions.AllowAny]
-    throttle_classes = [AnonRateThrottle]
 
     def post(self, request):
         serializer = CustomerRegisterSerializer(data=request.data)
@@ -524,7 +522,6 @@ class QRLoginAPIView(APIView):
     """
 
     permission_classes = [permissions.AllowAny]
-    throttle_classes = [AnonRateThrottle]
 
     def post(self, request):
         from django.core.cache import cache

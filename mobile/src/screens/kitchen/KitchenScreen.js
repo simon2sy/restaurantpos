@@ -10,7 +10,7 @@ import { kitchenApi } from '../../services/kitchenApi';
 import LoadingSpinner from '../../components/LoadingSpinner';
 import ErrorView from '../../components/ErrorView';
 import { toList } from '../../utils/data';
-import useRealtime from '../../hooks/useRealtime';
+import useWebSocket from '../../hooks/useWebSocket';
 
 const STATUS_META = {
   PENDING: { label: 'Pending', color: COLORS.kitchenPending, icon: 'time' },
@@ -124,7 +124,7 @@ export default function KitchenScreen() {
 
   // Live updates - when a waiter confirms an order or a batch status changes,
   // refetch immediately so the kitchen stays in real time.
-  useRealtime('kitchen', (msg) => {
+  useWebSocket('kitchen', (msg) => {
     if (msg && (msg.type === 'new_order' || msg.type === 'batch_status')) {
       fetchBatches();
     }

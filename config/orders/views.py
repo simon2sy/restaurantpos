@@ -320,12 +320,11 @@ def payment(request, order_id):
         complete_payment(
             order=order,
             payment_method=payment_method,
+            user=request.user,
+            request=request,
         )
 
-        return redirect(
-            "orders:order_detail",
-            order_id=order.id,
-        )
+        return redirect("core:home")
 
     return render(
         request,
