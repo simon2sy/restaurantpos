@@ -224,7 +224,10 @@ export default function DashboardScreen({ navigation }) {
     if (idx !== activeSlide && idx >= 0 && idx < slides.length) setActiveSlide(idx);
   };
 
-  const others = slides.filter((s) => s.key !== slides[activeSlide].key);
+  // Remove the 'expenses' card from the "Others" tile row below the hero
+  // carousel. (The expense metric is still available inside the carousel itself,
+  // where it can be swiped to as the focused card.)
+  const others = slides.filter((s. => s.key !== slides[activeSlide].key && s.key !== 'expenses');
 
   // Load pending "food ready" notifications from the server so the banner
   // reflects reality on app start / refresh (not just live events).
