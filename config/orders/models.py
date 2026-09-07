@@ -1,7 +1,7 @@
 from django.conf import settings
 from django.db import models
 
-from core.models import TimeStampedModel
+from core.models import Restaurant, TenantModel
 
 
 class PaymentMethod(models.TextChoices):
@@ -10,7 +10,7 @@ class PaymentMethod(models.TextChoices):
     ONLINE = "ONLINE", "Online"
 
 
-class Table(TimeStampedModel):
+class Table(TenantModel):
 
     class Status(models.TextChoices):
         AVAILABLE = "AVAILABLE", "Available"
