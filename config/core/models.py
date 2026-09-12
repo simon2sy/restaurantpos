@@ -14,6 +14,7 @@ class TimeStampedModel(models.Model):
 
 
 class Restaurant(models.Model):
+<<<<<<< HEAD
     """A restaurant location (tenant). Each restaurant has its own staff, menu, orders, etc.
 
     Tenant isolation is enforced at the application level: every restaurant-owned
@@ -45,6 +46,16 @@ class Restaurant(models.Model):
         null=True,
         help_text="Short internal code for the restaurant (e.g., 'R001').",
     )
+=======
+    """A tenant in the (multi-restaurant) POS.
+
+    Each Restaurant owns its own menu, tables, orders, staff, expenses, etc. (row-level isolation via a shared database).
+    """
+
+    name = models.CharField(max_length=200, default="Restaurant POS")
+    slug = models.SlugField(max_length=100, unique=True, db_index=True,
+                  help_text="Short URL/subdomain identifier, e.g. kathmandu-thali")
+>>>>>>> eb3f16e1ac2df291645ae1c9aea13db89ea5ac68
     address = models.TextField(blank=True)
     phone = models.CharField(max_length=30, blank=True)
     contact_email = models.EmailField(blank=True)
@@ -149,16 +160,27 @@ class RestaurantSettings(models.Model):
     )
     receipt_footer = models.CharField(max_length=255, blank=True)
 
-    created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
+    owner = models.ForeignKey(
+        "auth.User",
+        on_delete=models.SET_NULL,
+        related_name="owned_restaurants",
+        null=True,
+        blank=True,
+        help_text="The superuser/owner account who manages this restaurant.",
+    )
+
+    created_at = models.DateTimeField(auto_now_add=True）
+    updated_at = models.DateTimeField(auto_now=True）
 
     class Meta:
-        verbose_name = "Restaurant Settings"
-        verbose_name_plural = "Restaurant Settings"
+        verbose_name = "Restaurant"
+        verbose_name_plural = "Restaurants"
+        ordering = ["name"]
 
     def __str__(self):
         return f"Settings for {self.restaurant.name}"
 
+<<<<<<< HEAD
     @classmethod
     def get(cls, restaurant):
         """Get settings for a specific restaurant."""
@@ -170,6 +192,36 @@ class RestaurantSettings(models.Model):
         """For backwards compatibility: get settings for default restaurant."""
         default_restaurant = Restaurant.get_default()
         return cls.get(default_restaurant)
+=======
+
+class TenantManager(models.Manager):
+    """Default manager for tenant-owned models.
+
+    Adds ``for_restaurant()`` so every tenant query can be scoped to one
+    restaurant with a single call, preventing cross-tenant leakage.
+
+    def for_restaurant(self, restaurant_or_id, **filters):
+        from django.db.models import Q
+        rid = getattr(restaurant_or_id, "id", restaurant_or_id)
+        return self.get_queryset().filter(Q(restaurant_id=rid) **filters)
+
+
+class TenantModel(models.Model):
+    """Abstract base sharing a ``restaurant`` FK and tenant-scoped manager.
+
+
+    restaurant = models.ForeignKey(
+        Restaurant,
+        on_delete=models.CASCADE,
+        related_name="%(class)s_set",
+        help_text="The restaurant (tenant) that owns this record.",
+    )
+
+    objects = TenantManager()
+
+    class Meta:
+        abstract = True
+>>>>>>> eb3f16e1ac2df291645ae1c9aea13db89ea5ac68
 
 
 class AuditLog(models.Model):
@@ -177,10 +229,17 @@ class AuditLog(models.Model):
 
     restaurant = models.ForeignKey(
         Restaurant,
+<<<<<<< HEAD
         on_delete=models.SET_NULL,
         null=True,
         blank=True,
         related_name="audit_logs",
+=======
+        on_delete=models.CASCADE,
+        related_name="audit_logs",
+        null=True,
+        blank=True,
+>>>>>>> eb3f16e1ac2df291645ae1c9aea13db89ea5ac68
     )
 
     user = models.ForeignKey(
@@ -237,6 +296,14 @@ class Notification(TimeStampedModel):
         max_length=30,
         choices=Type.choices,
         default=Type.ORDER_READY,
+    )
+
+    restaurant = models.ForeignKey(
+        Restaurant,
+        on_delete=models.CASCADE,
+        related_name="notifications",
+        null=True,
+        blank=True,
     )
 
     order = models.ForeignKey(

@@ -208,9 +208,37 @@ export default function MainNavigator() {
       })}
     >
       <Tab.Screen name="Home" component={HomeStack} />
-      {showOrders && <Tab.Screen name="Orders" component={OrdersStack} />}
-      <Tab.Screen name="Menu" component={MenuStack} />
-      <Tab.Screen name="More" component={MoreStack} />
+      {showOrders && (
+        <Tab.Screen
+          name="Orders"
+          component={OrdersStack}
+          listeners={({ navigation }) => ({
+            tabPress: () => {
+              navigation.navigate('Orders', { screen: 'OrderList' });
+            },
+          })}
+        />
+      )}
+      <Tab.Screen
+        name="Menu"
+        component={MenuStack}
+        listeners={({ navigation }) => ({
+          tabPress: () => {
+            // Tapping the Menu tab while on a sub-screen (e.g. AddMenuItem)
+            // should always return to the menu list (MenuHome).
+            navigation.navigate('Menu', { screen: 'MenuHome' });
+          },
+        })}
+      />
+      <Tab.Screen
+        name="More"
+        component={MoreStack}
+        listeners={({ navigation }) => ({
+          tabPress: () => {
+            navigation.navigate('More', { screen: 'MoreHome' });
+          },
+        })}
+      />
     </Tab.Navigator>
   );
 }

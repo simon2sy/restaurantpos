@@ -133,6 +133,12 @@ if os.getenv("DB_NAME"):
             "PASSWORD": os.getenv("DB_PASSWORD", ""),
             "HOST": os.getenv("DB_HOST", "127.0.0.1"),
             "PORT": os.getenv("DB_PORT", "5432"),
+            "CONN_MAX_AGE": 600,
+            # Run a lightweight "SELECT 1" before reusing a pooled connection.
+            # Prevents the classic "idle then 500" error when Render/her puts an
+            # idle pooled connection down: we detect issuand reopen instead of sending
+            # a stale socket. Best fix for "leave it idle -> internal server error".
+            "CONN_HEALTH_CHECKS": True,
         }
     }
 else:
@@ -143,6 +149,11 @@ else:
         ssl_require=False,
     )
 }
+    # Same health-check guard for the DATABASE_URL (Render free PostgreSQL) path.
+
+    if "default" in DATABASES:
+
+        DATABASES["default"]["CONN_HEALTH_CHECKS"] = True
 
 
 # Password validation
