@@ -11,11 +11,10 @@ def require_role(user, *roles):
     if user.is_superuser:
         return
 
-    employee = getattr(
-        user,
-        "employee_profile",
-        None,
-    )
+    # Platform admins bypass role checks (they can do anything)
+    employee = getattr(user, "employee_profile", None)
+    if employee and employee.is_active and employee.role == "PLATFORM_ADMIN":
+        return
 
     if not employee or not employee.is_active:
         raise PermissionDenied
@@ -26,7 +25,7 @@ def require_role(user, *roles):
 
 def role_required(*roles):
     """View decorator enforcing that the logged-in employee has one of
-    ``roles``. Superusers always pass through."""
+    ``roles``. Superusers and platform admins always pass through."""
 
     def decorator(view_func):
 
@@ -41,6 +40,6 @@ def role_required(*roles):
 
 
 # Roles allowed into back-of-house / management areas.
-MANAGEMENT_ROLES = ("MANAGER",)
-CASHIER_ROLES = ("WAITER", "CASHIER", "MANAGER")
-KITCHEN_ROLES = ("KITCHEN", "MANAGER")
+MANAGEMENT_ROLES = ("MANAGER", "RESTAURANT_ADMIN")
+CASHIER_ROLES = ("WAITER", "CASHIER", "MANAGER", "RESTAURANT_ADMIN")
+KITCHEN_ROLES = ("KITCHEN", "MANAGER", "RESTAURANT_ADMIN")

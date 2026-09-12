@@ -8,6 +8,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from core.api_permissions import IsManager, IsSuperUserOrManager
+from core.tenant import TenantScopedMixin, get_tenant
 from orders.models import Order, OrderItem
 from reports.models import Expense
 from reports.services import (
@@ -83,8 +84,19 @@ class SalesReportView(APIView):
     def get(self, request):
         start_dt, end_dt, from_d, to_d = _resolve_range(request)
 
+        # Get current restaurant from user's profile.
+        from core.services import get_current_restaurant
+        try:
+            current_restaurant = get_current_restaurant(request)
+        except ImproperlyConfigured:
+            return Response(
+                {"success": False, "message": "Your account has no restaurant assigned.", "errors": {}},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
         paid_orders = Order.objects.annotate(revenue_ts=Coalesce("paid_at", "created_at")).filter(
-            payment_status=Order.PaymentStatus.PAID
+            restaurant=current_restaurant,
+            payment_status=Order.PaymentStatus.PAID,
         ).exclude(status=Order.Status.CANCELLED)
 
         if start_dt:
@@ -104,6 +116,7 @@ class SalesReportView(APIView):
         )
 
         unpaid_stats = Order.objects.filter(
+            restaurant=current_restaurant,
             payment_status=Order.PaymentStatus.UNPAID,
         ).exclude(status=Order.Status.CANCELLED).aggregate(
             count=Count("id"), amount=Sum("total")
@@ -158,7 +171,10 @@ class SalesReportView(APIView):
             m["revenue"] = str(m["revenue"]) if m["revenue"] else "0"
 
         # Category performance
-        cat_items = OrderItem.objects.filter(batch__order__payment_status=Order.PaymentStatus.PAID)
+        cat_items = OrderItem.objects.filter(
+            batch__order__restaurant=current_restaurant,
+            batch__order__payment_status=Order.PaymentStatus.PAID,
+        )
         if start_dt:
             cat_items = cat_items.filter(batch__order__paid_at__gte=start_dt)
         if end_dt:
@@ -254,24 +270,39 @@ class DashboardStatsView(APIView):
     def get(self, request):
         from orders.models import Table, Cabin, OrderBatch
         from accounts.models import EmployeeProfile
+        from core.services import get_current_restaurant
+        from django.core.exceptions import ImproperlyConfigured
 
+        try:
+            current_restaurant = get_current_restaurant(request)
+        except ImproperlyConfigured:
+            return Response(
+                {"success": False, "message": "Your account has no restaurant assigned.", "errors": {}},
+                status=status.HTTP_403_FORBIDDEN,
+            )
         now = timezone.now()
         today = now.replace(hour=0, minute=0, second=0, microsecond=0)
 
-        todays_orders = Order.objects.filter(created_at__gte=today)
+        todays_orders = Order.objects.filter(
+            restaurant=current_restaurant,
+            created_at__gte=today,
+        )
 
         stats = {
             "orders_today": todays_orders.count(),
             "revenue_today": str(
                 Order.objects.annotate(revenue_ts=Coalesce("paid_at", "created_at")).filter(
+                    restaurant=current_restaurant,
                     revenue_ts__gte=today,
                     payment_status=Order.PaymentStatus.PAID,
                 ).aggregate(total=Sum("total"))["total"] or 0
             ),
             "unpaid_orders": Order.objects.filter(
+                restaurant=current_restaurant,
                 payment_status=Order.PaymentStatus.UNPAID,
             ).exclude(status=Order.Status.CANCELLED).count(),
             "open_orders": Order.objects.filter(
+                restaurant=current_restaurant,
                 status__in=[
                     Order.Status.OPEN,
                     Order.Status.PREPARING,
@@ -279,14 +310,28 @@ class DashboardStatsView(APIView):
                     Order.Status.SERVED,
                 ]
             ).count(),
-            "tables_occupied": Table.objects.filter(status=Table.Status.OCCUPIED).count(),
-            "tables_total": Table.objects.count(),
-            "cabins_occupied": Cabin.objects.filter(status=Cabin.Status.OCCUPIED).count(),
-            "cabins_total": Cabin.objects.count(),
+            "tables_occupied": Table.objects.filter(
+                restaurant=current_restaurant,
+                status=Table.Status.OCCUPIED,
+            ).count(),
+            "tables_total": Table.objects.filter(
+                restaurant=current_restaurant,
+            ).count(),
+            "cabins_occupied": Cabin.objects.filter(
+                restaurant=current_restaurant,
+                status=Cabin.Status.OCCUPIED,
+            ).count(),
+            "cabins_total": Cabin.objects.filter(
+                restaurant=current_restaurant,
+            ).count(),
             "kitchen_pending": OrderBatch.objects.filter(
+                restaurant=current_restaurant,
                 status__in=[OrderBatch.Status.PENDING, OrderBatch.Status.PREPARING]
             ).count(),
-            "active_employees": EmployeeProfile.objects.filter(is_active=True).count(),
+            "active_employees": EmployeeProfile.objects.filter(
+                restaurant=current_restaurant,
+                is_active=True,
+            ).count(),
         }
 
         return Response(
@@ -311,7 +356,7 @@ def _expense_range(request):
     return _resolve_range(request)
 
 
-class ExpenseListCreateView(generics.ListCreateAPIView):
+class ExpenseListCreateView(TenantScopedMixin, generics.ListCreateAPIView):
     """GET/POST /api/v1/reports/expenses/
 
     List expenses (optionally filtered with ?period=today|7|month|all)
@@ -322,7 +367,7 @@ class ExpenseListCreateView(generics.ListCreateAPIView):
     permission_classes = [IsSuperUserOrManager]
 
     def get_queryset(self):
-        qs = Expense.objects.select_related("recorded_by")
+        qs = super().get_queryset().select_related("recorded_by")
         start_dt, end_dt, _, _ = _resolve_range(self.request)
         if start_dt:
             qs = qs.filter(spent_on__gte=start_dt.date())
@@ -334,7 +379,9 @@ class ExpenseListCreateView(generics.ListCreateAPIView):
         return qs
 
     def perform_create(self, serializer):
-        serializer.save(recorded_by=self.request.user)
+        # Automatically assign the restaurant from the user's profile
+        restaurant = get_tenant(self.request)
+        serializer.save(recorded_by=self.request.user, restaurant=restaurant)
 
     def create(self, request, *args, **kwargs):
         response = super().create(request, *args, **kwargs)
@@ -376,7 +423,18 @@ class ExpenseSummaryView(APIView):
 
     def get(self, request):
         start_dt, end_dt, _, _ = _resolve_range(request)
-        qs = Expense.objects.all()
+        # Scope to the user's restaurant
+        restaurant = get_tenant(request)
+        if restaurant is None:
+            return Response(
+                {
+                    "success": True,
+                    "message": "Expense summary loaded.",
+                    "data": {"total": "0", "count": 0},
+                }
+            )
+
+        qs = Expense.objects.filter(restaurant=restaurant)
         if start_dt:
             qs = qs.filter(spent_on__gte=start_dt.date())
         if end_dt:
@@ -412,7 +470,15 @@ class DailySummaryTriggerView(APIView):
             format_summary_message,
         )
 
-        data = build_summary_data()
+        # Scope to the requesting manager's restaurant (tenant isolation)
+        restaurant = get_tenant(request)
+        if restaurant is None:
+            return Response(
+                {"success": False, "message": "No restaurant assigned.", "errors": {}},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
+        data = build_summary_data(restaurant)
 
         if request.data.get("dry_run"):
             return Response(
@@ -424,7 +490,7 @@ class DailySummaryTriggerView(APIView):
                 status=status.HTTP_200_OK,
             )
 
-        result = send_summary_to_managers(data)
+        result = send_summary_to_managers(restaurant, data)
 
         return Response(
             {

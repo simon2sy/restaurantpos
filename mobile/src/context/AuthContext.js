@@ -1,12 +1,13 @@
 import React, { createContext, useState, useEffect, useContext, useCallback } from 'react';
 import * as SecureStore from 'expo-secure-store';
 import { authApi } from '../services/authApi';
-import { ACCESS_TOKEN_KEY, REFRESH_TOKEN_KEY } from '../constants/config';
+import { ACCESS_TOKEN_KEY, REFRESH_TOKEN_KEY, RESTAURANT_DATA_KEY } from '../constants/config';
 
 const AuthContext = createContext(null);
 
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
+  const [restaurant, setRestaurant] = useState(null);
   const [loading, setLoading] = useState(true);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
 
@@ -23,15 +24,22 @@ export function AuthProvider({ children }) {
         if (response?.data) {
           setUser(response.data);
           setIsLoggedIn(true);
+          // Try to load cached restaurant data
+          const cachedRestaurant = await SecureStore.getItemAsync(RESTAURANT_DATA_KEY);
+          if (cachedRestaurant) {
+            setRestaurant(JSON.parse(cachedRestaurant));
+          }
         } else {
           await SecureStore.deleteItemAsync(ACCESS_TOKEN_KEY);
           await SecureStore.deleteItemAsync(REFRESH_TOKEN_KEY);
+          await SecureStore.deleteItemAsync(RESTAURANT_DATA_KEY);
         }
       }
     } catch (error) {
       // Token expired or invalid
       await SecureStore.deleteItemAsync(ACCESS_TOKEN_KEY);
       await SecureStore.deleteItemAsync(REFRESH_TOKEN_KEY);
+      await SecureStore.deleteItemAsync(RESTAURANT_DATA_KEY);
     } finally {
       setLoading(false);
     }
@@ -42,7 +50,11 @@ export function AuthProvider({ children }) {
     if (response?.data?.user) {
       setUser(response.data.user);
       setIsLoggedIn(true);
-      return response.data.user;
+      if (response.data.restaurant) {
+        setRestaurant(response.data.restaurant);
+        await SecureStore.setItemAsync(RESTAURANT_DATA_KEY, JSON.stringify(response.data.restaurant));
+      }
+      return { user: response.data.user, restaurant: response.data.restaurant };
     }
     throw new Error(response?.message || 'Login failed');
   }, []);
@@ -61,7 +73,9 @@ export function AuthProvider({ children }) {
     const refreshToken = await SecureStore.getItemAsync(REFRESH_TOKEN_KEY);
     await authApi.logout(refreshToken);
     setUser(null);
+    setRestaurant(null);
     setIsLoggedIn(false);
+    await SecureStore.deleteItemAsync(RESTAURANT_DATA_KEY);
   }, []);
 
   const qrLogin = useCallback(async (token) => {
@@ -87,10 +101,12 @@ export function AuthProvider({ children }) {
   const isKitchen = hasRole('KITCHEN', 'MANAGER');
   const isCashier = hasRole('WAITER', 'CASHIER', 'MANAGER');
   const isDelivery = hasRole('DELIVERY', 'MANAGER');
+  const isWaiter = hasRole('WAITER');
   const isCustomer = user && !user.is_employee && !user.is_superuser;
 
   const value = {
     user,
+    restaurant,
     loading,
     isLoggedIn,
     login,
@@ -102,6 +118,7 @@ export function AuthProvider({ children }) {
     isKitchen,
     isCashier,
     isDelivery,
+    isWaiter,
     isCustomer,
   };
 

@@ -6,6 +6,9 @@ export const notificationApi = {
   /** Fetch undismissed notifications (pass { all: '1' } for everything). */
   list: (params = {}) => api.get(`${PREFIX}/`, params),
 
+  /** Fetch unread/undismissed notifications. */
+  getUnread: () => api.get(`${PREFIX}/`, { dismissed: 'false' }),
+
   /** Dismiss a single notification by ID. */
   dismiss: (id) => api.post(`${PREFIX}/${id}/dismiss/`),
 

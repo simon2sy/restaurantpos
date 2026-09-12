@@ -12,6 +12,8 @@ import NotificationBell from '../components/NotificationBell';
 
 // Home
 import DashboardScreen from '../screens/dashboard/DashboardScreen';
+import AdminDashboardScreen from '../screens/dashboard/AdminDashboardScreen';
+import WaiterDashboardScreen from '../screens/dashboard/WaiterDashboardScreen';
 
 // Orders
 import OrderListScreen from '../screens/orders/OrderListScreen';
@@ -57,10 +59,14 @@ const defaultScreenOptions = {
 // ============================================================
 
 function HomeStack() {
-  const { user } = useAuth();
-  // Kitchen-only staff get the Kitchen Display (KDS) as their home screen;
-  // everyone else (incl. managers/admins) gets the analytics dashboard.
-  const isKitchenOnly = user?.role === 'KITCHEN';
+  const { user, isManager, isKitchen, isWaiter, isCashier } = useAuth();
+  // Kitchen-only staff get the Kitchen Display (KDS) as their home screen.
+  // Managers/admins get the admin dashboard with analytics and staff management.
+  // Waiters get the waiter dashboard with order overview and quick actions.
+  // Cashiers get the waiter dashboard (order-focused).
+  const isKitchenOnly = isKitchen && !isManager;
+  const isAdmin = isManager || user?.is_superuser;
+  const isWaiterOrCashier = isWaiter || isCashier;
 
   return (
     <Stack.Navigator screenOptions={defaultScreenOptions}>
@@ -70,6 +76,10 @@ function HomeStack() {
           component={KitchenScreen}
           options={{ headerShown: false }}
         />
+      ) : isAdmin ? (
+        <Stack.Screen name="HomeAdmin" component={AdminDashboardScreen} options={{ headerShown: false }} />
+      ) : isWaiterOrCashier ? (
+        <Stack.Screen name="HomeWaiter" component={WaiterDashboardScreen} options={{ headerShown: false }} />
       ) : (
         <Stack.Screen name="HomeHome" component={DashboardScreen} options={{ headerShown: false }} />
       )}

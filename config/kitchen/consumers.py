@@ -2,12 +2,23 @@ import json
 
 from channels.generic.websocket import AsyncWebsocketConsumer
 
+from core.tenant import get_ws_tenant, ws_tenant_group
+
 
 class KitchenConsumer(AsyncWebsocketConsumer):
 
     async def connect(self):
+        # SECURITY: Derive restaurant from the authenticated user's profile,
+        # NOT from the URL. This prevents a Restaurant A user from joining
+        # Restaurant B's kitchen group by manipulating the URL.
+        self.restaurant = await get_ws_tenant(self.scope)
 
-        self.room_group_name = "kitchen"
+        if self.restaurant is None:
+            # Reject connection if user has no valid restaurant assignment
+            await self.close(code=4001)
+            return
+
+        self.room_group_name = ws_tenant_group(self.restaurant, "kitchen")
 
         await self.channel_layer.group_add(
             self.room_group_name,
@@ -18,10 +29,11 @@ class KitchenConsumer(AsyncWebsocketConsumer):
 
     async def disconnect(self, close_code):
 
-        await self.channel_layer.group_discard(
-            self.room_group_name,
-            self.channel_name,
-        )
+        if hasattr(self, "room_group_name"):
+            await self.channel_layer.group_discard(
+                self.room_group_name,
+                self.channel_name,
+            )
 
     async def kitchen_order(self, event):
 
@@ -54,8 +66,14 @@ class WaiterConsumer(AsyncWebsocketConsumer):
     """Pushes 'food ready' notifications to waiter dashboards."""
 
     async def connect(self):
+        # SECURITY: Derive restaurant from the authenticated user's profile
+        self.restaurant = await get_ws_tenant(self.scope)
 
-        self.room_group_name = "waiters"
+        if self.restaurant is None:
+            await self.close(code=4001)
+            return
+
+        self.room_group_name = ws_tenant_group(self.restaurant, "waiters")
 
         await self.channel_layer.group_add(
             self.room_group_name,
@@ -66,10 +84,11 @@ class WaiterConsumer(AsyncWebsocketConsumer):
 
     async def disconnect(self, close_code):
 
-        await self.channel_layer.group_discard(
-            self.room_group_name,
-            self.channel_name,
-        )
+        if hasattr(self, "room_group_name"):
+            await self.channel_layer.group_discard(
+                self.room_group_name,
+                self.channel_name,
+            )
 
     async def order_ready(self, event):
 
@@ -83,7 +102,6 @@ class WaiterConsumer(AsyncWebsocketConsumer):
                 "ready_at": event.get("ready_at"),
             })
         )
-
 
     async def order_served(self, event):
 
@@ -101,12 +119,21 @@ class DashboardConsumer(AsyncWebsocketConsumer):
     Also sends real-time payment notifications when payments are received."""
 
     async def connect(self):
-        self.room_group_name = "dashboard"
+        # SECURITY: Derive restaurant from the authenticated user's profile
+        self.restaurant = await get_ws_tenant(self.scope)
+
+        if self.restaurant is None:
+            await self.close(code=4001)
+            return
+
+        self.room_group_name = ws_tenant_group(self.restaurant, "dashboard")
         await self.channel_layer.group_add(self.room_group_name, self.channel_name)
         await self.accept()
 
     async def disconnect(self, close_code):
-        await self.channel_layer.group_discard(self.room_group_name, self.channel_name)
+
+        if hasattr(self, "room_group_name"):
+            await self.channel_layer.group_discard(self.room_group_name, self.channel_name)
 
     async def dashboard_update(self, event):
         await self.send(

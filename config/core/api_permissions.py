@@ -8,8 +8,8 @@ class IsSuperUser(BasePermission):
         return request.user and request.user.is_authenticated and request.user.is_superuser
 
 
-class IsManager(BasePermission):
-    """Allow access to managers and superusers."""
+class IsPlatformAdmin(BasePermission):
+    """Allow access to platform admins and superusers."""
 
     def has_permission(self, request, view):
         if not request.user or not request.user.is_authenticated:
@@ -17,11 +17,27 @@ class IsManager(BasePermission):
         if request.user.is_superuser:
             return True
         profile = getattr(request.user, "employee_profile", None)
-        return profile is not None and profile.is_active and profile.role == "MANAGER"
+        return profile is not None and profile.is_active and profile.role == "PLATFORM_ADMIN"
+
+
+class IsManager(BasePermission):
+    """Allow access to managers, restaurant admins, platform admins and superusers."""
+
+    def has_permission(self, request, view):
+        if not request.user or not request.user.is_authenticated:
+            return False
+        if request.user.is_superuser:
+            return True
+        profile = getattr(request.user, "employee_profile", None)
+        return (
+            profile is not None
+            and profile.is_active
+            and profile.role in ("MANAGER", "RESTAURANT_ADMIN", "PLATFORM_ADMIN")
+        )
 
 
 class IsAdminOrManager(BasePermission):
-    """Allow access to managers and superusers (alias for clarity)."""
+    """Allow access to managers, restaurant admins, platform admins and superusers."""
 
     def has_permission(self, request, view):
         if not request.user or not request.user.is_authenticated:
@@ -29,11 +45,15 @@ class IsAdminOrManager(BasePermission):
         if request.user.is_superuser:
             return True
         profile = getattr(request.user, "employee_profile", None)
-        return profile is not None and profile.is_active and profile.role in ("MANAGER",)
+        return (
+            profile is not None
+            and profile.is_active
+            and profile.role in ("MANAGER", "RESTAURANT_ADMIN", "PLATFORM_ADMIN")
+        )
 
 
 class IsCashierRole(BasePermission):
-    """Allow WAITER, CASHIER, and MANAGER roles plus superusers."""
+    """Allow WAITER, CASHIER, MANAGER, RESTAURANT_ADMIN roles plus superusers."""
 
     def has_permission(self, request, view):
         if not request.user or not request.user.is_authenticated:
@@ -41,11 +61,15 @@ class IsCashierRole(BasePermission):
         if request.user.is_superuser:
             return True
         profile = getattr(request.user, "employee_profile", None)
-        return profile is not None and profile.is_active and profile.role in ("WAITER", "CASHIER", "MANAGER")
+        return (
+            profile is not None
+            and profile.is_active
+            and profile.role in ("WAITER", "CASHIER", "MANAGER", "RESTAURANT_ADMIN", "PLATFORM_ADMIN")
+        )
 
 
 class IsKitchenRole(BasePermission):
-    """Allow KITCHEN and MANAGER roles plus superusers."""
+    """Allow KITCHEN, MANAGER, RESTAURANT_ADMIN roles plus superusers."""
 
     def has_permission(self, request, view):
         if not request.user or not request.user.is_authenticated:
@@ -53,11 +77,15 @@ class IsKitchenRole(BasePermission):
         if request.user.is_superuser:
             return True
         profile = getattr(request.user, "employee_profile", None)
-        return profile is not None and profile.is_active and profile.role in ("KITCHEN", "MANAGER")
+        return (
+            profile is not None
+            and profile.is_active
+            and profile.role in ("KITCHEN", "MANAGER", "RESTAURANT_ADMIN", "PLATFORM_ADMIN")
+        )
 
 
 class IsDeliveryRole(BasePermission):
-    """Allow DELIVERY and MANAGER roles plus superusers."""
+    """Allow DELIVERY, MANAGER, RESTAURANT_ADMIN roles plus superusers."""
 
     def has_permission(self, request, view):
         if not request.user or not request.user.is_authenticated:
@@ -65,7 +93,11 @@ class IsDeliveryRole(BasePermission):
         if request.user.is_superuser:
             return True
         profile = getattr(request.user, "employee_profile", None)
-        return profile is not None and profile.is_active and profile.role in ("DELIVERY", "MANAGER")
+        return (
+            profile is not None
+            and profile.is_active
+            and profile.role in ("DELIVERY", "MANAGER", "RESTAURANT_ADMIN", "PLATFORM_ADMIN")
+        )
 
 
 class IsAnyStaff(BasePermission):
@@ -92,7 +124,7 @@ class IsCustomer(BasePermission):
 
 
 class IsSuperUserOrManager(BasePermission):
-    """Superuser or MANAGER role."""
+    """Superuser, platform admin, restaurant admin, or MANAGER role."""
 
     def has_permission(self, request, view):
         if not request.user or not request.user.is_authenticated:
@@ -100,12 +132,16 @@ class IsSuperUserOrManager(BasePermission):
         if request.user.is_superuser:
             return True
         profile = getattr(request.user, "employee_profile", None)
-        return profile is not None and profile.is_active and profile.role == "MANAGER"
+        return (
+            profile is not None
+            and profile.is_active
+            and profile.role in ("MANAGER", "RESTAURANT_ADMIN", "PLATFORM_ADMIN")
+        )
 
 
 def require_role(user, *roles):
     """Raise PermissionDenied unless the user has one of the given roles.
-    Superusers always pass. Mirrors core.permissions.require_role."""
+    Superusers and platform admins always pass."""
     from rest_framework.exceptions import PermissionDenied
 
     if not user.is_authenticated:
@@ -117,6 +153,10 @@ def require_role(user, *roles):
     profile = getattr(user, "employee_profile", None)
     if not profile or not profile.is_active:
         raise PermissionDenied("No active employee profile.")
+
+    # Platform admins bypass role checks
+    if profile.role == "PLATFORM_ADMIN":
+        return
 
     if profile.role not in roles:
         raise PermissionDenied("You do not have permission to perform this action.")

@@ -81,12 +81,15 @@ def select_food(request):
         delivery_data["delivery_fee"] = Decimal("0")
 
     # --------------------------------
-    # GET AVAILABLE FOOD
+    # GET AVAILABLE FOOD (scoped to current restaurant)
     # --------------------------------
+    from core.services import get_current_restaurant
+    current_restaurant = get_current_restaurant(request)
 
     categories = (
         Category.objects
         .filter(
+            restaurant=current_restaurant,
             is_active=True,
             items__is_available=True,
         )
@@ -261,6 +264,22 @@ def select_food(request):
 
 @login_required
 def delivery_dashboard(request):
+    # Only customers (no employee profile) should reach this page.
+    # Staff without a profile should not be here.
+    if not is_customer(request.user):
+        from django.shortcuts import render as _render
+        return _render(
+            request,
+            "pages/error.html",
+            {
+                "title": "Access Denied",
+                "message": "This page is for customers only.",
+            },
+            status=403,
+        )
+
+    from core.services import get_current_restaurant
+    current_restaurant = get_current_restaurant(request)
 
     deliveries = (
         Delivery.objects
@@ -268,6 +287,7 @@ def delivery_dashboard(request):
         .prefetch_related(
             "order__batches__items__menu_item"
         )
+        .filter(order__restaurant=current_restaurant)
         .order_by("-created_at")
     )
 
@@ -292,7 +312,15 @@ def cart_add(request, item_id):
     if request.method != "POST":
         return redirect("menu:menu_list")
 
-    item = get_object_or_404(MenuItem, id=item_id, is_available=True)
+    from core.services import get_current_restaurant
+
+    current_restaurant = get_current_restaurant(request)
+    item = get_object_or_404(
+        MenuItem,
+        id=item_id,
+        is_available=True,
+        restaurant=current_restaurant,
+    )
 
     try:
         qty = int(request.POST.get("qty", 1))
@@ -385,7 +413,12 @@ def _cart_lines(cart):
     from menu.models import MenuItem
 
     ids = [int(i) for i in cart.keys() if str(i).isdigit()]
-    items = MenuItem.objects.filter(id__in=ids).select_related("category")
+    from core.services import get_current_restaurant
+
+    current_restaurant = get_current_restaurant(request)
+    items = MenuItem.objects.filter(
+        id__in=ids, restaurant=current_restaurant
+    ).select_related("category")
 
     lines = []
     subtotal = Decimal("0")

@@ -17,7 +17,13 @@ class Table(TimeStampedModel):
         OCCUPIED = "OCCUPIED", "Occupied"
         RESERVED = "RESERVED", "Reserved"
 
-    number = models.PositiveIntegerField(unique=True)
+    restaurant = models.ForeignKey(
+        "core.Restaurant",
+        on_delete=models.CASCADE,
+        related_name="tables",
+    )
+
+    number = models.PositiveIntegerField()
 
     capacity = models.PositiveIntegerField(default=4)
 
@@ -29,8 +35,11 @@ class Table(TimeStampedModel):
 
     is_active = models.BooleanField(default=True)
 
+    class Meta:
+        unique_together = [["restaurant", "number"]]
+
     def __str__(self):
-        return f"Table {self.number}"
+        return f"Table {self.number} ({self.restaurant.name})"
 
 
 class Cabin(TimeStampedModel):
@@ -40,7 +49,13 @@ class Cabin(TimeStampedModel):
         OCCUPIED = "OCCUPIED", "Occupied"
         RESERVED = "RESERVED", "Reserved"
 
-    number = models.PositiveIntegerField(unique=True)
+    restaurant = models.ForeignKey(
+        "core.Restaurant",
+        on_delete=models.CASCADE,
+        related_name="cabins",
+    )
+
+    number = models.PositiveIntegerField()
 
     capacity = models.PositiveIntegerField(default=6)
 
@@ -52,8 +67,11 @@ class Cabin(TimeStampedModel):
 
     is_active = models.BooleanField(default=True)
 
+    class Meta:
+        unique_together = [["restaurant", "number"]]
+
     def __str__(self):
-        return f"Cabin {self.number}"
+        return f"Cabin {self.number} ({self.restaurant.name})"
 
 
 class Order(TimeStampedModel):
@@ -76,8 +94,14 @@ class Order(TimeStampedModel):
         UNPAID = "UNPAID", "Unpaid"
         PAID = "PAID", "Paid"
 
+    restaurant = models.ForeignKey(
+        "core.Restaurant",
+        on_delete=models.CASCADE,
+        related_name="orders",
+    )
+
     order_number = models.PositiveIntegerField(
-        unique=True,
+        unique=False,
         editable=False,
     )
 
@@ -172,6 +196,7 @@ class Order(TimeStampedModel):
         if not self.order_number:
             last_order = (
                 Order.objects
+                .filter(restaurant=self.restaurant)
                 .order_by("-order_number")
                 .first()
             )
@@ -192,6 +217,12 @@ class OrderBatch(TimeStampedModel):
         PREPARING = "PREPARING", "Preparing"
         READY = "READY", "Ready"
         COMPLETED = "COMPLETED", "Completed"
+
+    restaurant = models.ForeignKey(
+        "core.Restaurant",
+        on_delete=models.CASCADE,
+        related_name="order_batches",
+    )
 
     order = models.ForeignKey(
         Order,
@@ -248,6 +279,12 @@ class OrderItem(TimeStampedModel):
         READY = "READY", "Ready"
         SERVED = "SERVED", "Served"
         CANCELLED = "CANCELLED", "Cancelled"
+
+    restaurant = models.ForeignKey(
+        "core.Restaurant",
+        on_delete=models.CASCADE,
+        related_name="order_items",
+    )
 
     batch = models.ForeignKey(
         OrderBatch,

@@ -21,6 +21,7 @@ export default function LoginScreen({ navigation }) {
     }
     setLoading(true);
     try {
+      // Restaurant context is resolved server-side from the user's profile.
       await login(username.trim(), password);
     } catch (error) {
       Alert.alert('Login Failed', error.message || 'Invalid credentials.');
@@ -120,11 +121,6 @@ export default function LoginScreen({ navigation }) {
           >
             <Ionicons name="qr-code-outline" size={20} color={COLORS.primary} />
             <Text style={styles.qrButtonText}>Sign in with Staff QR</Text>
-          </TouchableOpacity>
-          <TouchableOpacity onPress={() => navigation.navigate('Register')}>
-            <Text style={styles.footerText}>
-              Don't have an account? <Text style={styles.link}>Sign Up</Text>
-            </Text>
           </TouchableOpacity>
         </View>
       </ScrollView>

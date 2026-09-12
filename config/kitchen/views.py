@@ -15,9 +15,14 @@ from .services import (
 @role_required(*KITCHEN_ROLES)
 def kitchen_dashboard(request):
 
+    # Scope to the kitchen worker's restaurant.
+    profile = getattr(request.user, "employee_profile", None)
+    restaurant = profile.restaurant if profile and profile.restaurant else None
+
     batches = (
         OrderBatch.objects
         .filter(
+            restaurant=restaurant,
             status__in=[
                 OrderBatch.Status.PENDING,
                 OrderBatch.Status.PREPARING,
@@ -46,9 +51,14 @@ def kitchen_dashboard(request):
 @role_required(*KITCHEN_ROLES)
 def start_batch_view(request, batch_id):
 
+    # Scope to the kitchen worker's restaurant (tenant isolation)
+    profile = getattr(request.user, "employee_profile", None)
+    restaurant = profile.restaurant if profile and profile.restaurant else None
+
     batch = get_object_or_404(
         OrderBatch,
         id=batch_id,
+        restaurant=restaurant,
     )
 
     if request.method == "POST":
@@ -61,9 +71,14 @@ def start_batch_view(request, batch_id):
 @role_required(*KITCHEN_ROLES)
 def ready_batch_view(request, batch_id):
 
+    # Scope to the kitchen worker's restaurant (tenant isolation)
+    profile = getattr(request.user, "employee_profile", None)
+    restaurant = profile.restaurant if profile and profile.restaurant else None
+
     batch = get_object_or_404(
         OrderBatch,
         id=batch_id,
+        restaurant=restaurant,
     )
 
     if request.method == "POST":

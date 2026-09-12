@@ -4,7 +4,16 @@ from orders.models import Order
 
 
 class DeliveryPerson(models.Model):
-    """A simple delivery staff member who can be assigned to deliveries."""
+    """A delivery staff member who can be assigned to deliveries.
+
+    Each delivery person belongs to a specific restaurant (tenant).
+    """
+
+    restaurant = models.ForeignKey(
+        "core.Restaurant",
+        on_delete=models.CASCADE,
+        related_name="delivery_persons",
+    )
 
     name = models.CharField(max_length=150)
     phone = models.CharField(max_length=20, blank=True)
@@ -17,7 +26,7 @@ class DeliveryPerson(models.Model):
         ordering = ["name"]
 
     def __str__(self):
-        return self.name
+        return f"{self.name} ({self.restaurant.name})"
 
 
 class Delivery(models.Model):
@@ -28,6 +37,12 @@ class Delivery(models.Model):
         OUT_FOR_DELIVERY = "OUT_FOR_DELIVERY", "Out for Delivery"
         DELIVERED = "DELIVERED", "Delivered"
         CANCELLED = "CANCELLED", "Cancelled"
+
+    restaurant = models.ForeignKey(
+        "core.Restaurant",
+        on_delete=models.CASCADE,
+        related_name="deliveries",
+    )
 
     order = models.OneToOneField(
         Order,

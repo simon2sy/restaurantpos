@@ -115,9 +115,29 @@ def report_dashboard(request):
     payment-method split and category performance."""
     require_role(request.user, *MANAGEMENT_ROLES)
 
+    # Get current restaurant from user's profile.
+    # Managers must have a restaurant assigned.
+    from core.services import get_current_restaurant
+    try:
+        current_restaurant = get_current_restaurant(request)
+    except ImproperlyConfigured:
+        from django.shortcuts import render as _render
+        return _render(
+            request,
+            "pages/error.html",
+            {
+                "title": "Restaurant Not Assigned",
+                "message": "Your account has not been assigned to a restaurant. Contact your administrator.",
+            },
+            status=403,
+        )
+
     start_dt, end_dt, range_label, period, from_d, to_d = _resolve_range(request)
 
-    paid_orders = Order.objects.filter(payment_status=PAID).exclude(
+    paid_orders = Order.objects.filter(
+        restaurant=current_restaurant,
+        payment_status=PAID,
+    ).exclude(
         status=Order.Status.CANCELLED,
     )
     if start_dt:
@@ -137,6 +157,7 @@ def report_dashboard(request):
     )
 
     unpaid_stats = Order.objects.filter(
+        restaurant=current_restaurant,
         payment_status=Order.PaymentStatus.UNPAID,
     ).exclude(status=Order.Status.CANCELLED).aggregate(
         count=Count("id"), amount=Sum("total"),
@@ -189,7 +210,10 @@ def report_dashboard(request):
     max_monthly = max((m["revenue"] or 0 for m in monthly), default=0)
 
     # ── CATEGORY PERFORMANCE ──
-    cat_items = OrderItem.objects.filter(batch__order__payment_status=PAID)
+    cat_items = OrderItem.objects.filter(
+        batch__order__restaurant=current_restaurant,
+        batch__order__payment_status=PAID,
+    )
     if start_dt:
         cat_items = cat_items.filter(batch__order__created_at__gte=start_dt)
     if end_dt:

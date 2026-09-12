@@ -30,6 +30,10 @@ export const authApi = {
 
   getProfile: () => api.get(`${PREFIX}/me/`),
 
+  getRestaurant: () => api.get(`${PREFIX}/restaurant/`),
+
+  updateRestaurant: (data) => api.patch(`${PREFIX}/restaurant/`, data),
+
   changePassword: (oldPassword, newPassword) =>
     api.post(`${PREFIX}/password/change/`, {
       old_password: oldPassword,

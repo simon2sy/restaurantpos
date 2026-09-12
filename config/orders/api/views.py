@@ -23,6 +23,7 @@ def friendly_validation_message(detail):
 
 from accounts.models import EmployeeProfile
 from core.api_permissions import IsAnyStaff, IsCashierRole, IsSuperUserOrManager
+from core.tenant import TenantScopedMixin, enforce_tenant_access, get_tenant
 from menu.models import Category, MenuItem
 from orders.models import Cabin, Order, OrderBatch, Table
 from orders.selectors import get_open_cabin_order, get_open_table_order
@@ -51,6 +52,26 @@ from .serializers import (
 
 
 # ============================================================
+# TENANT-SCOPED ORDER FETCHING HELPER
+# ============================================================
+
+
+def get_tenant_order(request, order_id):
+    """Fetch an order only if it belongs to the authenticated user's restaurant.
+
+    This is the central helper for all order action views to ensure
+    tenant isolation. Returns the Order instance or None.
+    """
+    restaurant = get_tenant(request)
+    if restaurant is None:
+        return None
+    try:
+        return Order.objects.get(pk=order_id, restaurant=restaurant)
+    except Order.DoesNotExist:
+        return None
+
+
+# ============================================================
 # SEATING / TABLES / CABINS
 # ============================================================
 
@@ -64,8 +85,21 @@ class SeatingDashboardView(APIView):
     permission_classes = [IsCashierRole]
 
     def get(self, request):
-        tables = list(Table.objects.filter(is_active=True).order_by("number"))
-        cabins = list(Cabin.objects.filter(is_active=True).order_by("number"))
+        # Get restaurant from user's profile (server-side, not from client)
+        restaurant = get_tenant(request)
+
+        if restaurant is None:
+            return Response(
+                {
+                    "success": False,
+                    "message": "No restaurant assigned to your account.",
+                    "data": {"tables": [], "cabins": [], "tables_available": 0},
+                },
+                status=status.HTTP_200_OK,
+            )
+
+        tables = list(Table.objects.filter(restaurant=restaurant, is_active=True).order_by("number"))
+        cabins = list(Cabin.objects.filter(restaurant=restaurant, is_active=True).order_by("number"))
 
         for table in tables:
             table._open_order = get_open_table_order(table)
@@ -94,8 +128,10 @@ class SeatingDashboardView(APIView):
 # ============================================================
 
 
-class TableListCreateView(generics.ListCreateAPIView):
+class TableListCreateView(TenantScopedMixin, generics.ListCreateAPIView):
     """GET/POST /api/v1/orders/tables/"""
+
+    queryset = Table.objects.all()
 
     def get_serializer_class(self):
         if self.request.method == "POST":
@@ -108,11 +144,13 @@ class TableListCreateView(generics.ListCreateAPIView):
         return [IsAnyStaff()]
 
     def get_queryset(self):
-        return Table.objects.order_by("number")
+        return super().get_queryset().filter(is_active=True).order_by("number")
 
 
-class TableDetailView(generics.RetrieveUpdateDestroyAPIView):
+class TableDetailView(TenantScopedMixin, generics.RetrieveUpdateDestroyAPIView):
     """GET/PUT/PATCH/DELETE /api/v1/orders/tables/<pk>/"""
+
+    queryset = Table.objects.all()
 
     def get_serializer_class(self):
         if self.request.method in ("PUT", "PATCH"):
@@ -127,7 +165,7 @@ class TableDetailView(generics.RetrieveUpdateDestroyAPIView):
         return [IsAnyStaff()]
 
     def get_queryset(self):
-        return Table.objects.all()
+        return super().get_queryset()
 
 
 # ============================================================
@@ -135,8 +173,10 @@ class TableDetailView(generics.RetrieveUpdateDestroyAPIView):
 # ============================================================
 
 
-class CabinListCreateView(generics.ListCreateAPIView):
+class CabinListCreateView(TenantScopedMixin, generics.ListCreateAPIView):
     """GET/POST /api/v1/orders/cabins/"""
+
+    queryset = Cabin.objects.all()
 
     def get_serializer_class(self):
         if self.request.method == "POST":
@@ -149,11 +189,13 @@ class CabinListCreateView(generics.ListCreateAPIView):
         return [IsAnyStaff()]
 
     def get_queryset(self):
-        return Cabin.objects.order_by("number")
+        return super().get_queryset().filter(is_active=True).order_by("number")
 
 
-class CabinDetailView(generics.RetrieveUpdateDestroyAPIView):
+class CabinDetailView(TenantScopedMixin, generics.RetrieveUpdateDestroyAPIView):
     """GET/PUT/PATCH/DELETE /api/v1/orders/cabins/<pk>/"""
+
+    queryset = Cabin.objects.all()
 
     def get_serializer_class(self):
         if self.request.method in ("PUT", "PATCH"):
@@ -168,7 +210,7 @@ class CabinDetailView(generics.RetrieveUpdateDestroyAPIView):
         return [IsAnyStaff()]
 
     def get_queryset(self):
-        return Cabin.objects.all()
+        return super().get_queryset()
 
 
 # ============================================================
@@ -176,11 +218,13 @@ class CabinDetailView(generics.RetrieveUpdateDestroyAPIView):
 # ============================================================
 
 
-class OrderListCreateView(generics.ListCreateAPIView):
+class OrderListCreateView(TenantScopedMixin, generics.ListCreateAPIView):
     """GET/POST /api/v1/orders/
 
     List orders or create a new order.
     """
+
+    queryset = Order.objects.all()
 
     def get_serializer_class(self):
         if self.request.method == "POST":
@@ -193,8 +237,8 @@ class OrderListCreateView(generics.ListCreateAPIView):
         return [IsAnyStaff()]
 
     def get_queryset(self):
-        qs = Order.objects.select_related(
-            "table", "cabin", "created_by"
+        qs = super().get_queryset().select_related(
+            "table", "cabin", "created_by", "restaurant"
         ).order_by("-created_at")
 
         # Filter by status
@@ -289,12 +333,16 @@ class OrderListCreateView(generics.ListCreateAPIView):
         )
 
 
-class OrderDetailView(generics.RetrieveUpdateDestroyAPIView):
+class OrderDetailView(TenantScopedMixin, generics.RetrieveUpdateDestroyAPIView):
     """GET/DELETE /api/v1/orders/<pk>/"""
 
-    queryset = Order.objects.select_related(
-        "table", "cabin", "created_by"
-    ).prefetch_related("batches__items__menu_item")
+    queryset = Order.objects.all()
+
+    def get_queryset(self):
+        return super().get_queryset().select_related(
+            "table", "cabin", "created_by", "restaurant"
+        ).prefetch_related("batches__items__menu_item")
+
     serializer_class = OrderDetailSerializer
 
     def get_permissions(self):
@@ -344,6 +392,14 @@ class AddItemsView(APIView):
                 status=status.HTTP_404_NOT_FOUND,
             )
 
+        # Check restaurant access
+        profile = getattr(request.user, "employee_profile", None)
+        if profile and profile.restaurant and order.restaurant != profile.restaurant:
+            return Response(
+                {"success": False, "message": "Access denied to this order.", "errors": {}},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
         if order.status in (Order.Status.COMPLETED, Order.Status.CANCELLED):
             return Response(
                 {"success": False, "message": "This order is closed.", "errors": {}},
@@ -365,7 +421,9 @@ class AddItemsView(APIView):
         for item_data in serializer.validated_data["items"]:
             try:
                 menu_item = MenuItem.objects.get(
-                    pk=item_data["menu_item_id"], is_available=True
+                    pk=item_data["menu_item_id"],
+                    is_available=True,
+                    restaurant=order.restaurant,
                 )
             except MenuItem.DoesNotExist:
                 return Response(
@@ -425,9 +483,9 @@ class OrderStatusView(APIView):
     permission_classes = [IsCashierRole]
 
     def patch(self, request, pk):
-        try:
-            order = Order.objects.get(pk=pk)
-        except Order.DoesNotExist:
+        # Get the order, scoped to the user's restaurant
+        order = get_tenant_order(request, pk)
+        if order is None:
             return Response(
                 {"success": False, "message": "Order not found.", "errors": {}},
                 status=status.HTTP_404_NOT_FOUND,
@@ -472,9 +530,9 @@ class PaymentView(APIView):
     permission_classes = [IsCashierRole]
 
     def post(self, request, order_id):
-        try:
-            order = Order.objects.get(pk=order_id)
-        except Order.DoesNotExist:
+        # Get the order, scoped to the user's restaurant
+        order = get_tenant_order(request, order_id)
+        if order is None:
             return Response(
                 {"success": False, "message": "Order not found.", "errors": {}},
                 status=status.HTTP_404_NOT_FOUND,

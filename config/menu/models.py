@@ -5,9 +5,14 @@ from core.models import TimeStampedModel
 
 
 class Category(TimeStampedModel):
+    restaurant = models.ForeignKey(
+        "core.Restaurant",
+        on_delete=models.CASCADE,
+        related_name="categories",
+    )
+
     name = models.CharField(
         max_length=100,
-        unique=True,
     )
 
     description = models.TextField(
@@ -25,12 +30,19 @@ class Category(TimeStampedModel):
     class Meta:
         ordering = ["display_order", "name"]
         verbose_name_plural = "Categories"
+        unique_together = [["restaurant", "name"]]
 
     def __str__(self):
-        return self.name
+        return f"{self.name} ({self.restaurant.name})"
 
 
 class MenuItem(TimeStampedModel):
+    restaurant = models.ForeignKey(
+        "core.Restaurant",
+        on_delete=models.CASCADE,
+        related_name="menu_items",
+    )
+
     category = models.ForeignKey(
         Category,
         on_delete=models.PROTECT,
@@ -74,7 +86,13 @@ class MenuItem(TimeStampedModel):
 class Ingredient(TimeStampedModel):
     """A raw material tracked in basic inventory."""
 
-    name = models.CharField(max_length=150, unique=True)
+    restaurant = models.ForeignKey(
+        "core.Restaurant",
+        on_delete=models.CASCADE,
+        related_name="ingredients",
+    )
+
+    name = models.CharField(max_length=150)
     unit = models.CharField(
         max_length=30,
         default="unit",
@@ -91,9 +109,10 @@ class Ingredient(TimeStampedModel):
 
     class Meta:
         ordering = ["name"]
+        unique_together = [["restaurant", "name"]]
 
     def __str__(self):
-        return self.name
+        return f"{self.name} ({self.restaurant.name})"
 
     @property
     def is_low_stock(self):

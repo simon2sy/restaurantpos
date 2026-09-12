@@ -48,10 +48,15 @@ def seating_dashboard(request):
 @login_required
 def create_table_order(request, table_id):
 
+    # Scope to the cashier's restaurant (tenant isolation)
+    profile = getattr(request.user, "employee_profile", None)
+    restaurant = profile.restaurant if profile and profile.restaurant else None
+
     table = get_object_or_404(
         Table,
         id=table_id,
         is_active=True,
+        restaurant=restaurant,
     )
 
     if table.status != Table.Status.AVAILABLE:
@@ -136,6 +141,10 @@ def create_table_order(request, table_id):
 @login_required
 def order_detail(request, order_id):
 
+    # Scope to the cashier's restaurant (tenant isolation)
+    profile = getattr(request.user, "employee_profile", None)
+    restaurant = profile.restaurant if profile and profile.restaurant else None
+
     order = get_object_or_404(
         Order.objects
         .select_related(
@@ -147,6 +156,7 @@ def order_detail(request, order_id):
             "batches__items__menu_item"
         ),
         id=order_id,
+        restaurant=restaurant,
     )
 
     return render(
@@ -161,10 +171,15 @@ def order_detail(request, order_id):
 @role_required(*CASHIER_ROLES)
 def create_cabin_order(request, cabin_id):
 
+    # Scope to the cashier's restaurant (tenant isolation)
+    profile = getattr(request.user, "employee_profile", None)
+    restaurant = profile.restaurant if profile and profile.restaurant else None
+
     cabin = get_object_or_404(
         Cabin,
         id=cabin_id,
         is_active=True,
+        restaurant=restaurant,
     )
 
     if request.method == "POST":
@@ -203,9 +218,14 @@ def create_cabin_order(request, cabin_id):
 @role_required(*CASHIER_ROLES)
 def add_items(request, order_id):
 
+    # Scope to the cashier's restaurant (tenant isolation)
+    profile = getattr(request.user, "employee_profile", None)
+    restaurant = profile.restaurant if profile and profile.restaurant else None
+
     order = get_object_or_404(
         Order,
         id=order_id,
+        restaurant=restaurant,
     )
 
     if order.status in [
@@ -287,9 +307,14 @@ def add_items(request, order_id):
 @role_required(*CASHIER_ROLES)
 def payment(request, order_id):
 
+    # Scope to the cashier's restaurant (tenant isolation)
+    profile = getattr(request.user, "employee_profile", None)
+    restaurant = profile.restaurant if profile and profile.restaurant else None
+
     order = get_object_or_404(
         Order,
         id=order_id,
+        restaurant=restaurant,
     )
 
     if order.payment_status == "PAID":

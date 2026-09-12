@@ -12,6 +12,7 @@ export const orderApi = {
     api.post(`${PREFIX}/${orderId}/payment/`, { payment_method: paymentMethod }),
   getSeating: () => api.get(`${PREFIX}/seating/`),
   cancel: (id) => api.delete(`${PREFIX}/${id}/`),
+  getActiveOrders: () => api.get(`${PREFIX}/`, { status__in: 'OPEN,PREPARING,READY' }),
   // Tables
   listTables: () => api.get(`${PREFIX}/tables/`),
   createTable: (data) => api.post(`${PREFIX}/tables/`, data),

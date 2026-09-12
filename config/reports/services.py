@@ -10,10 +10,13 @@ from django.utils import timezone
 from orders.models import Order, OrderItem
 
 
-def _order_base(start=None, end=None):
-    """Base queryset. Note: paid revenue elsewhere is keyed on paid_at
-    (via ``revenue_ts``); this base keeps created_at for order counts."""
-    qs = Order.objects.all()
+def _order_base(restaurant, start=None, end=None):
+    """Base queryset scoped to a single restaurant (tenant isolation).
+
+    SECURITY: ``restaurant`` is REQUIRED. Data is never aggregated across
+    restaurants.
+    """
+    qs = Order.objects.filter(restaurant=restaurant)
     if start is not None:
         qs = qs.filter(created_at__gte=start)
     if end is not None:
@@ -21,11 +24,17 @@ def _order_base(start=None, end=None):
     return qs
 
 
-def _paid_revenue_qs(start=None, end=None):
-    """Paid orders within a range, keyed on when payment happened."""
+def _paid_revenue_qs(restaurant, start=None, end=None):
+    """Paid orders within a range, keyed on when payment happened.
+
+    Scoped to a single restaurant (tenant isolation). ``restaurant`` REQUIRED.
+    """
     qs = Order.objects.annotate(
         revenue_ts=Coalesce("paid_at", "created_at")
-    ).filter(payment_status=Order.PaymentStatus.PAID)
+    ).filter(
+        restaurant=restaurant,
+        payment_status=Order.PaymentStatus.PAID,
+    )
     if start is not None:
         qs = qs.filter(revenue_ts__gte=start)
     if end is not None:
@@ -76,12 +85,15 @@ def _month_bounds(offset_months=0):
     return start, end
 
 
-def daily_sales(date=None):
-    """Aggregates for a single (default: today's) local day."""
-    start, end = _day_bounds()
-    qs = _order_base(start, end)
+def daily_sales(restaurant, date=None):
+    """Aggregates for a single (default: today's) local day.
 
-    paid = _paid_revenue_qs(start, end)
+    SECURITY: ``restaurant`` is REQUIRED (tenant isolation).
+    """
+    start, end = _day_bounds()
+    qs = _order_base(restaurant, start, end)
+
+    paid = _paid_revenue_qs(restaurant, start, end)
 
     paid_orders = paid.count()
     total_sales = paid.aggregate(v=Sum("total"))["v"] or 0
@@ -131,12 +143,16 @@ def daily_sales(date=None):
     }
 
 
-def get_top_selling_items(limit=10, days=7):
-    """Top selling menu items by quantity over the last N days."""
+def get_top_selling_items(restaurant, limit=10, days=7):
+    """Top selling menu items by quantity over the last N days.
+
+    SECURITY: ``restaurant`` is REQUIRED (tenant isolation).
+    """
     start, _ = _day_bounds(days - 1)
     return (
         OrderItem.objects
         .filter(
+            batch__order__restaurant=restaurant,
             batch__order__created_at__gte=start,
             batch__order__payment_status=Order.PaymentStatus.PAID,
         )
@@ -146,12 +162,16 @@ def get_top_selling_items(limit=10, days=7):
     )
 
 
-def get_lowest_selling_items(limit=5, days=30):
-    """Least selling items (have sales) over the last N days."""
+def get_lowest_selling_items(restaurant, limit=5, days=30):
+    """Least selling items (have sales) over the last N days.
+
+    SECURITY: ``restaurant`` is REQUIRED (tenant isolation).
+    """
     start, _ = _day_bounds(days - 1)
     return (
         OrderItem.objects
         .filter(
+            batch__order__restaurant=restaurant,
             batch__order__created_at__gte=start,
             batch__order__payment_status=Order.PaymentStatus.PAID,
         )
@@ -161,8 +181,11 @@ def get_lowest_selling_items(limit=5, days=30):
     )
 
 
-def sales_series(start, end, bucket="day"):
-    """Aggregate paid sales bucketed by day/week/month within [start, end]."""
+def sales_series(restaurant, start, end, bucket="day"):
+    """Aggregate paid sales bucketed by day/week/month within [start, end].
+
+    SECURITY: ``restaurant`` is REQUIRED (tenant isolation).
+    """
     trunc = {
         "day": TruncDate,
         "week": TruncWeek,
@@ -170,7 +193,7 @@ def sales_series(start, end, bucket="day"):
     }[bucket]
 
     rows = (
-        _paid_revenue_qs(start, end)
+        _paid_revenue_qs(restaurant, start, end)
         .annotate(bucket=trunc("revenue_ts"))
         .values("bucket")
         .annotate(sales=Sum("total"), count=Count("id"))
@@ -189,18 +212,18 @@ def sales_series(start, end, bucket="day"):
     return result
 
 
-def payment_method_breakdown(start=None, end=None):
+def payment_method_breakdown(restaurant, start=None, end=None):
     return (
-        _paid_revenue_qs(start, end)
+        _paid_revenue_qs(restaurant, start, end)
         .values("payment_method")
         .annotate(total=Sum("total"))
         .order_by()
     )
 
 
-def order_type_breakdown(start=None, end=None):
+def order_type_breakdown(restaurant, start=None, end=None):
     return (
-        _paid_revenue_qs(start, end)
+        _paid_revenue_qs(restaurant, start, end)
         .values("order_type")
         .annotate(total=Sum("total"), count=Count("id"))
         .order_by()

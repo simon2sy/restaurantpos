@@ -130,7 +130,7 @@ def send_push_to_users(users, title, body, data=None, sound=True):
     return {"sent": sent, "failed": failed}
 
 
-def send_push_to_role(role, title, body, data=None, sound=True):
+def send_push_to_role(role, title, body, data=None, sound=True, restaurant=None):
     """Send push notifications to all active employees with a specific role.
 
     Args:
@@ -139,29 +139,27 @@ def send_push_to_role(role, title, body, data=None, sound=True):
         body: Notification body text
         data: Optional dict of custom data
         sound: Whether to play a sound
+        restaurant: Optional Restaurant instance to scope notifications to
 
     Returns:
         dict with 'sent' and 'failed' counts
     """
     from accounts.models import EmployeeProfile
-    from core.models import DeviceToken
 
     employees = EmployeeProfile.objects.filter(
         role=role,
         is_active=True,
     ).select_related("user")
 
+    if restaurant is not None:
+        employees = employees.filter(restaurant=restaurant)
+
     users = [emp.user for emp in employees]
     
     # Log for debugging
     logger.info(f"Sending push notification to role '{role}': {len(users)} users found")
     
-    # Check which users have device tokens
-    users_with_tokens = DeviceToken.objects.filter(
-        user__in=users,
-        is_active=True,
-    ).values_list("user__username", flat=True)
-    
-    logger.info(f"Users with active device tokens for role '{role}': {list(users_with_tokens)}")
+    if restaurant:
+        logger.info(f"Scoped to restaurant: {restaurant.name}")
 
     return send_push_to_users(users, title, body, data=data, sound=sound)

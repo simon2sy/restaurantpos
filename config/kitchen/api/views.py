@@ -19,9 +19,14 @@ class KitchenDashboardView(APIView):
     permission_classes = [IsKitchenRole]
 
     def get(self, request):
+        # Scope to the kitchen worker's restaurant.
+        profile = getattr(request.user, "employee_profile", None)
+        restaurant = profile.restaurant if profile and profile.restaurant else None
+
         batches = (
             OrderBatch.objects
             .filter(
+                restaurant=restaurant,
                 status__in=[
                     OrderBatch.Status.PENDING,
                     OrderBatch.Status.PREPARING,
@@ -64,6 +69,14 @@ class StartBatchView(APIView):
                 status=status.HTTP_404_NOT_FOUND,
             )
 
+        # Verify the kitchen worker belongs to the same restaurant.
+        profile = getattr(request.user, "employee_profile", None)
+        if profile and profile.restaurant and batch.restaurant != profile.restaurant:
+            return Response(
+                {"success": False, "message": "Access denied to this batch.", "errors": {}},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
         try:
             batch = start_batch(batch)
         except ValueError as e:
@@ -99,6 +112,14 @@ class ReadyBatchView(APIView):
                 status=status.HTTP_404_NOT_FOUND,
             )
 
+        # Verify the kitchen worker belongs to the same restaurant.
+        profile = getattr(request.user, "employee_profile", None)
+        if profile and profile.restaurant and batch.restaurant != profile.restaurant:
+            return Response(
+                {"success": False, "message": "Access denied to this batch.", "errors": {}},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
         try:
             batch = mark_batch_ready(batch)
         except ValueError as e:
@@ -132,6 +153,14 @@ class CompleteBatchView(APIView):
             return Response(
                 {"success": False, "message": "Batch not found.", "errors": {}},
                 status=status.HTTP_404_NOT_FOUND,
+            )
+
+        # Verify the kitchen worker belongs to the same restaurant.
+        profile = getattr(request.user, "employee_profile", None)
+        if profile and profile.restaurant and batch.restaurant != profile.restaurant:
+            return Response(
+                {"success": False, "message": "Access denied to this batch.", "errors": {}},
+                status=status.HTTP_403_FORBIDDEN,
             )
 
         try:

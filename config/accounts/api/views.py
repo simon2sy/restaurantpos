@@ -10,7 +10,8 @@ from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
 
 from accounts.models import EmployeeActivity, EmployeeProfile
 from accounts.services import build_qr_png_response, generate_employee_qr, record_activity
-from core.api_permissions import IsSuperUser, IsSuperUserOrManager
+from core.api_permissions import IsPlatformAdmin, IsSuperUser, IsSuperUserOrManager
+from core.tenant import get_tenant
 
 from .serializers import (
     CurrentUserSerializer,
@@ -47,6 +48,7 @@ class LoginView(APIView):
 
         username = request.data.get("username", "").strip()
         password = request.data.get("password", "")
+        restaurant_slug = request.data.get("restaurant_slug", "").strip()
 
         if not username or not password:
             return Response(
@@ -103,17 +105,42 @@ class LoginView(APIView):
                 status=status.HTTP_403_FORBIDDEN,
             )
 
-        # Check employee profile is active (if exists)
+        # Get employee profile
         profile = getattr(user, "employee_profile", None)
-        if profile and not profile.is_active:
-            return Response(
-                {
-                    "success": False,
-                    "message": "Employee account is disabled.",
-                    "errors": {},
-                },
-                status=status.HTTP_403_FORBIDDEN,
-            )
+
+        # Superusers can login without restaurant validation
+        if not user.is_superuser:
+            if profile and not profile.is_active:
+                return Response(
+                    {
+                        "success": False,
+                        "message": "Employee account is disabled.",
+                        "errors": {},
+                    },
+                    status=status.HTTP_403_FORBIDDEN,
+                )
+            # Restaurant slug is OPTIONAL and never determines tenancy — the
+            # tenant always comes from the server-side employee profile.
+            # If a legacy client still sends one, verify it matches.
+            if profile and restaurant_slug and profile.restaurant:
+                if profile.restaurant.slug != restaurant_slug:
+                    return Response(
+                        {
+                            "success": False,
+                            "message": "Invalid restaurant identifier.",
+                            "errors": {"restaurant_slug": ["Does not match."]},
+                        },
+                        status=status.HTTP_403_FORBIDDEN,
+                    )
+            if profile and profile.restaurant and not profile.restaurant.is_subscription_active:
+                    return Response(
+                        {
+                            "success": False,
+                            "message": "Restaurant subscription has expired.",
+                            "errors": {},
+                        },
+                        status=status.HTTP_403_FORBIDDEN,
+                    )
 
         # Clear lockout on success (best-effort)
         try:
@@ -143,9 +170,15 @@ class LoginView(APIView):
         access_token["username"] = user.username
         access_token["first_name"] = user.first_name
         access_token["last_name"] = user.last_name
+        restaurant = None
         if profile:
             access_token["role"] = profile.role
             access_token["is_employee"] = True
+            restaurant = profile.restaurant
+            if restaurant:
+                access_token["restaurant_id"] = restaurant.id
+                access_token["restaurant_name"] = restaurant.name
+                access_token["restaurant_slug"] = restaurant.slug
         else:
             access_token["role"] = None
             access_token["is_employee"] = False
@@ -161,6 +194,17 @@ class LoginView(APIView):
             except Exception:
                 pass  # Activity recording is best-effort
 
+        # Build restaurant response data
+        restaurant_data = None
+        if restaurant:
+            restaurant_data = {
+                "id": restaurant.id,
+                "name": restaurant.name,
+                "slug": restaurant.slug,
+                "logo": restaurant.logo.url if restaurant.logo else None,
+                "subscription_plan": restaurant.subscription_plan,
+            }
+
         return Response(
             {
                 "success": True,
@@ -169,6 +213,7 @@ class LoginView(APIView):
                     "access": str(access_token),
                     "refresh": str(refresh),
                     "user": CurrentUserSerializer(user).data,
+                    "restaurant": restaurant_data,
                 },
             },
             status=status.HTTP_200_OK,
@@ -302,9 +347,11 @@ class EmployeeListCreateView(generics.ListCreateAPIView):
     """GET/POST /api/v1/accounts/employees/
 
     List all employees (GET) or create one (POST).
+
+    SECURITY: Non-superuser managers can only see employees in their own restaurant.
     """
 
-    queryset = EmployeeProfile.objects.select_related("user").order_by("user__first_name")
+    serializer_class = EmployeeProfileSerializer
 
     def get_serializer_class(self):
         if self.request.method == "POST":
@@ -316,32 +363,28 @@ class EmployeeListCreateView(generics.ListCreateAPIView):
             return [IsSuperUser()]
         return [IsSuperUserOrManager()]
 
-    def create(self, request, *args, **kwargs):
-        create_serializer = EmployeeCreateSerializer(data=request.data)
-        create_serializer.is_valid(raise_exception=True)
-        employee = create_serializer.save()
-        record_activity(employee, "EMPLOYEE_CREATED", detail="Employee profile created via API.")
-        return Response(
-            {
-                "success": True,
-                "message": f"Employee '{employee}' created successfully.",
-                "data": EmployeeProfileSerializer(employee).data,
-            },
-            status=status.HTTP_201_CREATED,
-        )
-
     def get_queryset(self):
         qs = EmployeeProfile.objects.select_related("user").order_by("user__first_name")
-        # Non-superuser managers can only see active employees
-        if not self.request.user.is_superuser:
-            qs = qs.filter(is_active=True)
-        return qs
+
+        # Superusers see all employees across all restaurants
+        if self.request.user.is_superuser:
+            return qs
+
+        # Non-superuser managers can only see employees in their own restaurant
+        restaurant = get_tenant(self.request)
+        if restaurant is not None:
+            return qs.filter(restaurant=restaurant, is_active=True)
+
+        # No restaurant assigned - see nothing
+        return qs.none()
 
 
 class EmployeeDetailView(generics.RetrieveUpdateDestroyAPIView):
-    """GET/PUT/PATCH/DELETE /api/v1/accounts/employees/<pk>/"""
+    """GET/PUT/PATCH/DELETE /api/v1/accounts/employees/<pk>/
 
-    queryset = EmployeeProfile.objects.select_related("user")
+    SECURITY: Non-superuser managers can only access employees in their own restaurant.
+    """
+
     serializer_class = EmployeeProfileSerializer
 
     def get_permissions(self):
@@ -355,6 +398,20 @@ class EmployeeDetailView(generics.RetrieveUpdateDestroyAPIView):
         if self.request.method in ("PUT", "PATCH"):
             return EmployeeUpdateSerializer
         return EmployeeProfileSerializer
+
+    def get_queryset(self):
+        qs = EmployeeProfile.objects.select_related("user")
+
+        # Superusers see all employees
+        if self.request.user.is_superuser:
+            return qs
+
+        # Non-superuser managers can only see employees in their own restaurant
+        restaurant = get_tenant(self.request)
+        if restaurant is not None:
+            return qs.filter(restaurant=restaurant)
+
+        return qs.none()
 
     def perform_destroy(self, instance):
         # Never allow deleting the last active admin
@@ -603,3 +660,197 @@ class EmployeeActivityListView(generics.ListAPIView):
     def get_queryset(self):
         pk = self.kwargs.get("pk")
         return EmployeeActivity.objects.filter(employee_id=pk).order_by("-created_at")[:50]
+
+
+# ============================================================
+# RESTAURANT REGISTRATION ENDPOINT
+# ============================================================
+
+
+class RestaurantRegisterView(APIView):
+    """POST /api/v1/auth/register-restaurant/
+
+    SECURITY: This endpoint is RESTRICTED to platform admins and superusers only.
+
+    Previously this was AllowAny, which allowed anyone to create a new restaurant.
+    New restaurants must only be created from the platform admin panel by an
+    authorized platform administrator.
+    """
+
+    permission_classes = [IsPlatformAdmin]
+
+    def post(self, request):
+        from core.models import Restaurant
+
+        restaurant_name = request.data.get("restaurant_name", "").strip()
+        restaurant_slug = request.data.get("restaurant_slug", "").strip()
+        admin_username = request.data.get("admin_username", "").strip()
+        admin_password = request.data.get("admin_password", "")
+        admin_first_name = request.data.get("admin_first_name", "").strip()
+        admin_last_name = request.data.get("admin_last_name", "").strip()
+        admin_email = request.data.get("admin_email", "").strip()
+        contact_phone = request.data.get("contact_phone", "").strip()
+
+        errors = {}
+        if not restaurant_name:
+            errors["restaurant_name"] = ["Required."]
+        if not restaurant_slug:
+            errors["restaurant_slug"] = ["Required."]
+        if not admin_username:
+            errors["admin_username"] = ["Required."]
+        if not admin_password or len(admin_password) < 8:
+            errors["admin_password"] = ["Min 8 characters."]
+        if not admin_first_name:
+            errors["admin_first_name"] = ["Required."]
+
+        if errors:
+            return Response(
+                {"success": False, "message": "Validation failed.", "errors": errors},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        if Restaurant.objects.filter(slug=restaurant_slug).exists():
+            return Response(
+                {"success": False, "message": "Identifier taken.", "errors": {"restaurant_slug": ["Exists."]}},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        if User.objects.filter(username__iexact=admin_username).exists():
+            return Response(
+                {"success": False, "message": "Username taken.", "errors": {"admin_username": ["Exists."]}},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        try:
+            restaurant = Restaurant.objects.create(
+                name=restaurant_name,
+                slug=restaurant_slug,
+                phone=contact_phone,
+                contact_email=admin_email,
+            )
+            admin_user = User.objects.create_user(
+                username=admin_username,
+                password=admin_password,
+                first_name=admin_first_name,
+                last_name=admin_last_name,
+                email=admin_email,
+            )
+            EmployeeProfile.objects.create(
+                user=admin_user,
+                restaurant=restaurant,
+                role=EmployeeProfile.Role.MANAGER,
+            )
+            refresh = RefreshToken.for_user(admin_user)
+            access_token = refresh.access_token
+            access_token["role"] = EmployeeProfile.Role.MANAGER
+            access_token["is_employee"] = True
+            access_token["restaurant_id"] = restaurant.id
+            access_token["restaurant_name"] = restaurant.name
+            access_token["restaurant_slug"] = restaurant.slug
+            return Response(
+                {
+                    "success": True,
+                    "message": "Restaurant registered.",
+                    "data": {
+                        "access": str(access_token),
+                        "refresh": str(refresh),
+                        "user": CurrentUserSerializer(admin_user).data,
+                        "restaurant": {"id": restaurant.id, "name": restaurant.name, "slug": restaurant.slug},
+                    },
+                },
+                status=status.HTTP_201_CREATED,
+            )
+        except Exception as exc:
+            import logging
+            logging.getLogger(__name__).error("Registration failed: %s", exc)
+            return Response(
+                {"success": False, "message": "Registration failed.", "errors": {}},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
+
+
+# ============================================================
+# RESTAURANT DETAIL ENDPOINT
+# ============================================================
+
+
+class RestaurantDetailView(APIView):
+    """GET /api/v1/auth/restaurant/ — Get current restaurant details.
+    PATCH /api/v1/auth/restaurant/ — Update restaurant (manager only)."""
+
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request):
+        profile = getattr(request.user, "employee_profile", None)
+        if not profile or not profile.restaurant:
+            return Response(
+                {"success": False, "message": "No restaurant.", "errors": {}},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+        restaurant = profile.restaurant
+        return Response(
+            {
+                "success": True,
+                "data": {
+                    "id": restaurant.id,
+                    "name": restaurant.name,
+                    "slug": restaurant.slug,
+                    "address": restaurant.address,
+                    "phone": restaurant.phone,
+                    "contact_email": restaurant.contact_email,
+                    "opening_hours": restaurant.opening_hours,
+                    "logo": restaurant.logo.url if restaurant.logo else None,
+                    "default_delivery_fee": str(restaurant.default_delivery_fee),
+                    "receipt_footer": restaurant.receipt_footer,
+                    "subscription_plan": restaurant.subscription_plan,
+                    "max_employees": restaurant.max_employees,
+                    "employee_count": restaurant.employee_count,
+                    "can_add_employee": restaurant.can_add_employee,
+                },
+            },
+            status=status.HTTP_200_OK,
+        )
+
+    def patch(self, request):
+        profile = getattr(request.user, "employee_profile", None)
+        if not profile or not profile.restaurant:
+            return Response(
+                {"success": False, "message": "No restaurant.", "errors": {}},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+        if profile.role != "MANAGER" and not request.user.is_superuser:
+            return Response(
+                {"success": False, "message": "Manager only.", "errors": {}},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+        restaurant = profile.restaurant
+        allowed = ["name", "address", "phone", "contact_email", "opening_hours", "receipt_footer"]
+        for field in allowed:
+            if field in request.data:
+                setattr(restaurant, field, request.data[field])
+        restaurant.save()
+        return Response(
+            {"success": True, "message": "Updated.", "data": {"id": restaurant.id, "name": restaurant.name}},
+            status=status.HTTP_200_OK,
+        )
+
+
+# ============================================================
+# RESTAURANT SCOPED MIXIN
+# ============================================================
+
+
+class RestaurantScopedMixin:
+    """Mixin that filters querysets to the current user's restaurant."""
+
+    def get_restaurant(self, request):
+        profile = getattr(request.user, "employee_profile", None)
+        if profile and profile.restaurant:
+            return profile.restaurant
+        return None
+
+    def get_queryset(self):
+        qs = super().get_queryset()
+        restaurant = self.get_restaurant(self.request)
+        if restaurant and hasattr(qs.model, "restaurant"):
+            return qs.filter(restaurant=restaurant)
+        return qs

@@ -6,4 +6,4 @@ from core.realtime import broadcast_dashboard_update
 
 @receiver(post_save, sender="reports.Expense")
 def broadcast_expense_change(sender, instance, **kwargs):
-    broadcast_dashboard_update(reason="expense")
+    broadcast_dashboard_update(restaurant=instance.restaurant, reason="expense")

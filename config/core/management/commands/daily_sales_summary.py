@@ -21,8 +21,12 @@ from django.utils import timezone
 logger = logging.getLogger(__name__)
 
 
-def build_summary_data():
-    """Build the daily sales summary from today's data."""
+def build_summary_data(restaurant):
+    """Build the daily sales summary from today's data for a single restaurant.
+
+    SECURITY: ``restaurant`` is required — data is NEVER aggregated across
+    restaurants. Each restaurant's summary contains only its own orders.
+    """
     now = timezone.localtime()
     today = now.date()
     today_start = timezone.make_aware(
@@ -35,6 +39,7 @@ def build_summary_data():
     from orders.models import Order
 
     paid_today = Order.objects.filter(
+        restaurant=restaurant,
         payment_status=Order.PaymentStatus.PAID,
         paid_at__date=today,
     ).exclude(status=Order.Status.CANCELLED)
@@ -60,6 +65,7 @@ def build_summary_data():
 
     top_items = list(
         OrderItem.objects.filter(
+            batch__order__restaurant=restaurant,
             batch__order__payment_status=Order.PaymentStatus.PAID,
             batch__order__paid_at__date=today,
         )
@@ -73,10 +79,13 @@ def build_summary_data():
 
     # Unpaid orders
     unpaid_count = Order.objects.filter(
+        restaurant=restaurant,
         payment_status=Order.PaymentStatus.UNPAID,
     ).exclude(status=Order.Status.CANCELLED).count()
 
     return {
+        "restaurant_id": restaurant.id,
+        "restaurant_name": restaurant.name,
         "date": str(today),
         "total_revenue": str(total_revenue),
         "total_orders": total_orders,
@@ -90,13 +99,14 @@ def build_summary_data():
 def format_summary_message(data):
     """Format the summary into a readable push notification body."""
     date = data["date"]
+    restaurant_name = data.get("restaurant_name", "Restaurant")
     revenue = data["total_revenue"]
     orders = data["total_orders"]
     avg = data["avg_order"]
     unpaid = data["unpaid_count"]
 
     lines = [
-        f"Daily Summary — {date}",
+        f"{restaurant_name} — Daily Summary {date}",
         "",
         f"Revenue: Rs. {revenue}",
         f"Orders: {orders}",
@@ -115,39 +125,61 @@ def format_summary_message(data):
     return "\n".join(lines)
 
 
-def send_summary_to_managers(data):
-    """Send the daily summary push notification to all managers and superusers."""
+def send_summary_to_managers(restaurant, data):
+    """Send the daily summary push notification to the managers of ONE restaurant.
+
+    SECURITY: Only managers belonging to ``restaurant`` receive this summary.
+    Data is never sent across restaurants.
+    """
     from accounts.models import EmployeeProfile
     from core.push import send_push_to_users
 
-    # Get all managers
+    # Managers for this specific restaurant only
     managers = EmployeeProfile.objects.filter(
+        restaurant=restaurant,
         role__in=[EmployeeProfile.Role.MANAGER],
         is_active=True,
     ).select_related("user")
 
-    # Get superusers
-    from django.contrib.auth.models import User
-
-    superusers = User.objects.filter(is_superuser=True)
-
-    # Combine
-    users = list(set([m.user for m in managers] + list(superusers)))
+    users = [m.user for m in managers]
 
     if not users:
-        logger.warning("No managers or superusers to send daily summary to")
+        logger.warning("No managers to send daily summary to for restaurant %s", restaurant.name)
         return {"sent": 0, "failed": 0}
 
-    title = f"Daily Summary — {data['date']}"
+    title = f"{restaurant.name} — Daily Summary {data['date']}"
     body = format_summary_message(data)
 
     return send_push_to_users(
         users,
         title=title,
         body=body,
-        data={"type": "daily_summary", "date": data["date"]},
+        data={"type": "daily_summary", "date": data["date"], "restaurant_id": restaurant.id},
         sound=False,  # Summary doesn't need sound
     )
+
+
+def send_all_restaurant_summaries():
+    """Build and send a per-restaurant summary to each restaurant's managers.
+
+    Each restaurant gets ONLY its own data. No cross-restaurant leakage.
+    """
+    from core.models import Restaurant
+
+    results = []
+    for restaurant in Restaurant.objects.filter(is_active=True):
+        try:
+            data = build_summary_data(restaurant)
+            result = send_summary_to_managers(restaurant, data)
+            results.append({
+                "restaurant": restaurant.name,
+                "restaurant_id": restaurant.id,
+                "sent": result["sent"],
+                "failed": result["failed"],
+            })
+        except Exception as exc:  # noqa: BLE001
+            logger.exception("Failed to build summary for restaurant %s: %s", restaurant.name, exc)
+    return results
 
 
 class Command(BaseCommand):
@@ -161,25 +193,32 @@ class Command(BaseCommand):
         )
 
     def handle(self, *args, **options):
-        data = build_summary_data()
+        from core.models import Restaurant
 
         if options["dry_run"]:
             self.stdout.write(self.style.SUCCESS("=== DAILY SUMMARY (dry run) ==="))
-            self.stdout.write(format_summary_message(data))
+            for restaurant in Restaurant.objects.filter(is_active=True):
+                data = build_summary_data(restaurant)
+                self.stdout.write(format_summary_message(data))
+                self.stdout.write("-" * 40)
             return
 
-        result = send_summary_to_managers(data)
+        results = send_all_restaurant_summaries()
+
+        total_sent = sum(r["sent"] for r in results)
+        total_failed = sum(r["failed"] for r in results)
 
         self.stdout.write(
             self.style.SUCCESS(
-                f"Daily summary sent: {result['sent']} sent, {result['failed']} failed"
+                f"Daily summary sent: {total_sent} sent, {total_failed} failed "
+                f"across {len(results)} restaurants"
             )
         )
 
         # Also log to database for audit
         logger.info(
-            "Daily summary: %s sent=%d failed=%d",
-            data["date"],
-            result["sent"],
-            result["failed"],
+            "Daily summary: %s restaurants, sent=%d failed=%d",
+            len(results),
+            total_sent,
+            total_failed,
         )

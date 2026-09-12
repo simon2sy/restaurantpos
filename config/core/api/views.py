@@ -5,6 +5,7 @@ from rest_framework.views import APIView
 
 from core.api_permissions import IsAnyStaff
 from core.models import Notification
+from core.tenant import get_tenant
 from .serializers import NotificationSerializer
 
 
@@ -18,10 +19,24 @@ class NotificationListView(APIView):
     permission_classes = [IsAnyStaff]
 
     def get(self, request):
-        qs = Notification.objects.select_related("order").filter(dismissed=False)
+        # Scope to the user's restaurant
+        restaurant = get_tenant(request)
+        if restaurant is None:
+            return Response(
+                {
+                    "success": True,
+                    "message": "Notifications loaded.",
+                    "data": [],
+                },
+                status=status.HTTP_200_OK,
+            )
+
+        qs = Notification.objects.select_related("order").filter(
+            restaurant=restaurant, dismissed=False
+        )
 
         if request.query_params.get("all") == "1":
-            qs = Notification.objects.select_related("order").all()
+            qs = Notification.objects.select_related("order").filter(restaurant=restaurant)
 
         notifications = qs[:50]  # safety cap
 
@@ -44,8 +59,20 @@ class NotificationDismissView(APIView):
     permission_classes = [IsAnyStaff]
 
     def post(self, request, pk):
+        # Get the notification, scoped to the user's restaurant
+        restaurant = get_tenant(request)
+        if restaurant is None:
+            return Response(
+                {
+                    "success": False,
+                    "message": "No restaurant assigned.",
+                    "errors": {},
+                },
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
         try:
-            notification = Notification.objects.get(pk=pk)
+            notification = Notification.objects.get(pk=pk, restaurant=restaurant)
         except Notification.DoesNotExist:
             return Response(
                 {
@@ -79,8 +106,22 @@ class NotificationDismissAllView(APIView):
     permission_classes = [IsAnyStaff]
 
     def post(self, request):
+        # Scope to the user's restaurant
+        restaurant = get_tenant(request)
+        if restaurant is None:
+            return Response(
+                {
+                    "success": True,
+                    "message": "0 notification(s) dismissed.",
+                    "data": {"dismissed_count": 0},
+                },
+                status=status.HTTP_200_OK,
+            )
+
         now = timezone.now()
-        updated = Notification.objects.filter(dismissed=False).update(
+        updated = Notification.objects.filter(
+            restaurant=restaurant, dismissed=False
+        ).update(
             dismissed=True, dismissed_at=now
         )
 

@@ -91,6 +91,16 @@ class OrderBatchAdmin(admin.ModelAdmin):
         "created_at",
     )
 
+    search_fields = (
+        "order__order_number",
+        "restaurant__name",
+        "batch_number",
+    )
+
+    list_filter = (
+        "status",
+    )
+
     inlines = [
         OrderItemInline,
     ]

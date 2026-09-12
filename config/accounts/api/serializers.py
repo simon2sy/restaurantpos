@@ -79,13 +79,15 @@ class CurrentUserSerializer(serializers.ModelSerializer):
     is_employee = serializers.SerializerMethodField()
     employee_id = serializers.SerializerMethodField()
     phone = serializers.SerializerMethodField()
+    restaurant = serializers.SerializerMethodField()
+    restaurant_id = serializers.SerializerMethodField()
 
     class Meta:
         model = User
         fields = [
             "id", "username", "first_name", "last_name", "email",
             "is_superuser", "is_staff", "role", "is_employee",
-            "employee_id", "phone",
+            "employee_id", "phone", "restaurant", "restaurant_id",
         ]
         read_only_fields = fields
 
@@ -103,6 +105,18 @@ class CurrentUserSerializer(serializers.ModelSerializer):
     def get_phone(self, obj):
         profile = getattr(obj, "employee_profile", None)
         return profile.phone if profile else None
+
+    def get_restaurant(self, obj):
+        profile = getattr(obj, "employee_profile", None)
+        if profile and profile.restaurant:
+            return profile.restaurant.name
+        return None
+
+    def get_restaurant_id(self, obj):
+        profile = getattr(obj, "employee_profile", None)
+        if profile and profile.restaurant:
+            return profile.restaurant.id
+        return None
 
 
 class CustomerRegisterSerializer(serializers.Serializer):
@@ -157,6 +171,8 @@ class EmployeeProfileSerializer(serializers.ModelSerializer):
     email = serializers.CharField(source="user.email", read_only=True)
     role_display = serializers.CharField(read_only=True)
     qr_token_valid = serializers.BooleanField(read_only=True)
+    restaurant_name = serializers.CharField(source="restaurant.name", read_only=True)
+    restaurant_id = serializers.IntegerField(source="restaurant.id", read_only=True)
 
     class Meta:
         model = EmployeeProfile
@@ -164,6 +180,7 @@ class EmployeeProfileSerializer(serializers.ModelSerializer):
             "id", "username", "first_name", "last_name", "email",
             "phone", "role", "role_display", "is_active",
             "qr_token_valid", "qr_token_expires_at",
+            "restaurant_name", "restaurant_id",
             "created_at", "updated_at",
         ]
         read_only_fields = [
@@ -173,13 +190,20 @@ class EmployeeProfileSerializer(serializers.ModelSerializer):
 
 
 class EmployeeCreateSerializer(serializers.Serializer):
-    """Create a new employee (superuser only)."""
+    """Create a new employee (superuser only).
+
+    ``restaurant_id`` is required for all staff roles so that every employee
+    belongs to a specific restaurant from day one. This prevents the
+    cross-restaurant data leakage that happens when an employee has no
+    restaurant assigned and the system falls back to the default.
+    """
 
     first_name = serializers.CharField(max_length=150)
     last_name = serializers.CharField(max_length=150, required=False, default="")
     username = serializers.CharField(max_length=150)
     phone = serializers.CharField(max_length=20, required=False, default="")
     role = serializers.ChoiceField(choices=EmployeeProfile.Role.choices)
+    restaurant_id = serializers.IntegerField(required=True)
 
     def validate_username(self, value):
         value = value.strip()
@@ -187,7 +211,15 @@ class EmployeeCreateSerializer(serializers.Serializer):
             raise serializers.ValidationError("An account with that username already exists.")
         return value
 
+    def validate_restaurant_id(self, value):
+        from core.models import Restaurant
+        if not Restaurant.objects.filter(pk=value).exists():
+            raise serializers.ValidationError("No restaurant with that ID exists.")
+        return value
+
     def create(self, validated_data):
+        restaurant = Restaurant.objects.get(pk=validated_data.pop("restaurant_id"))
+
         user = User.objects.create_user(
             username=validated_data["username"],
             first_name=validated_data["first_name"],
@@ -198,6 +230,7 @@ class EmployeeCreateSerializer(serializers.Serializer):
 
         return EmployeeProfile.objects.create(
             user=user,
+            restaurant=restaurant,
             phone=validated_data.get("phone", ""),
             role=validated_data["role"],
         )

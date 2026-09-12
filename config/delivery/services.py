@@ -5,6 +5,7 @@ from datetime import timedelta
 from django.db import transaction
 from django.utils import timezone
 
+from core.tenant import enforce_same_tenant
 from orders.models import Order
 from orders.services import (
     complete_payment,
@@ -31,7 +32,6 @@ VALID_DELIVERY_TRANSITIONS = {
     Delivery.Status.CANCELLED: [],
 }
 
-
 def can_transition(current, new):
     return new in VALID_DELIVERY_TRANSITIONS.get(current, [])
 
@@ -48,6 +48,13 @@ def assign_delivery(delivery, person):
     if not person.is_active:
         raise ValueError("Cannot assign an inactive delivery person.")
 
+    # CROSS-RESTAURANT VALIDATION: Ensure person belongs to same restaurant
+    if delivery.restaurant_id and person.restaurant_id:
+        if delivery.restaurant_id != person.restaurant_id:
+            raise ValueError(
+                "Cannot assign a delivery person from a different restaurant."
+            )
+
     delivery.assigned_person = person
     delivery.status = Delivery.Status.ASSIGNED
     delivery.save(update_fields=["assigned_person", "status"])
@@ -55,7 +62,6 @@ def assign_delivery(delivery, person):
     transition_order_status(delivery.order, Order.Status.READY)
 
     return delivery
-
 
 def change_delivery_status(delivery, new_status):
     """Advance a delivery along its allowed status path."""
@@ -104,9 +110,12 @@ def confirm_delivery(delivery):
     return delivery
 
 
-def get_due_deliveries():
-    """Deliveries that are not yet delivered or cancelled."""
-    return Delivery.objects.select_related(
+def get_due_deliveries(restaurant=None):
+    """Deliveries that are not yet delivered or cancelled.
+
+    If restaurant is provided, only returns deliveries for that restaurant.
+    """
+    qs = Delivery.objects.select_related(
         "order", "assigned_person"
     ).filter(
         status__in=[
@@ -114,4 +123,7 @@ def get_due_deliveries():
             Delivery.Status.ASSIGNED,
             Delivery.Status.OUT_FOR_DELIVERY,
         ]
-    ).order_by("-created_at")
+    )
+    if restaurant is not None:
+        qs = qs.filter(order__restaurant=restaurant)
+    return qs.order_by("-created_at")

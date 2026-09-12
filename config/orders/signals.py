@@ -6,9 +6,10 @@ from core.realtime import broadcast_dashboard_update
 
 @receiver(post_save, sender="orders.Order")
 def broadcast_order_change(sender, instance, **kwargs):
-    broadcast_dashboard_update(reason="order")
+    broadcast_dashboard_update(restaurant=instance.restaurant, reason="order")
 
 
 @receiver(post_save, sender="orders.OrderItem")
 def broadcast_order_item_change(sender, instance, **kwargs):
-    broadcast_dashboard_update(reason="order_item")
+    # OrderItem has a restaurant FK directly
+    broadcast_dashboard_update(restaurant=instance.restaurant, reason="order_item")

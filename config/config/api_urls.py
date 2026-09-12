@@ -2,6 +2,7 @@ from django.urls import include, path
 from drf_spectacular.views import SpectacularAPIView, SpectacularSwaggerView, SpectacularRedocView
 
 from core.api.realtime_views import RealtimePulseView
+from core.api.restaurant_views import RestaurantListCreateView, RestaurantDetailView, RestaurantSettingsView
 
 urlpatterns = [
     # API documentation
@@ -16,6 +17,11 @@ urlpatterns = [
     path("v1/delivery/", include("delivery.api.urls")),
     path("v1/reports/", include("reports.api.urls")),
     path("v1/notifications/", include("core.api.urls")),
+    # Restaurant management
+    path("v1/restaurants/", RestaurantListCreateView.as_view(), name="restaurant_list"),
+    path("v1/restaurants/<int:pk>/", RestaurantDetailView.as_view(), name="restaurant_detail"),
+    path("v1/restaurants/<int:pk>/settings/", RestaurantSettingsView.as_view(), name="restaurant_settings"),
+
     # HTTP polling fallback for hosts without WebSocket support (Passenger)
     path("v1/realtime/pulse/", RealtimePulseView.as_view(), name="realtime_pulse"),
 ]

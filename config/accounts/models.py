@@ -15,6 +15,8 @@ QR_TOKEN_VALIDITY_SECONDS = 7 * 24 * 3600  # 7 days
 class EmployeeProfile(TimeStampedModel):
 
     class Role(models.TextChoices):
+        PLATFORM_ADMIN = "PLATFORM_ADMIN", "Platform Admin"
+        RESTAURANT_ADMIN = "RESTAURANT_ADMIN", "Restaurant Admin"
         MANAGER = "MANAGER", "Manager"
         WAITER = "WAITER", "Waiter"
         KITCHEN = "KITCHEN", "Kitchen"
@@ -25,6 +27,15 @@ class EmployeeProfile(TimeStampedModel):
         User,
         on_delete=models.CASCADE,
         related_name="employee_profile",
+    )
+
+    restaurant = models.ForeignKey(
+        "core.Restaurant",
+        on_delete=models.CASCADE,
+        related_name="employees",
+        null=True,
+        blank=True,
+        help_text="The restaurant this employee belongs to. Null for platform admins.",
     )
 
     phone = models.CharField(
@@ -41,7 +52,7 @@ class EmployeeProfile(TimeStampedModel):
     qr_token = models.UUIDField(
         null=True,
         blank=True,
-        unique=True,
+        unique=False,
         editable=False,
     )
 
@@ -116,3 +127,34 @@ class EmployeeActivity(TimeStampedModel):
 
     def __str__(self):
         return f"{self.employee} — {self.action}"
+
+
+class RestaurantEmployee(models.Model):
+    """Links a User to a Restaurant as an employee."""
+
+    restaurant = models.ForeignKey(
+        "core.Restaurant",
+        on_delete=models.CASCADE,
+        related_name="restaurant_employees",
+    )
+
+    user = models.ForeignKey(
+        User,
+        on_delete=models.CASCADE,
+        related_name="restaurant_assignments",
+    )
+
+    role = models.CharField(
+        max_length=20,
+        choices=EmployeeProfile.Role.choices,
+    )
+
+    is_active = models.BooleanField(default=True)
+
+    class Meta:
+        unique_together = [["restaurant", "user"]]
+        verbose_name = "Restaurant Employee"
+        verbose_name_plural = "Restaurant Employees"
+
+    def __str__(self):
+        return f"{self.user.username} @ {self.restaurant.name}"

@@ -44,9 +44,9 @@ ALLOWED_HOSTS = [
     if host.strip()
 ]
 
-# If ALLOWED_HOSTS is empty in DEBUG, allow localhost for convenience.
+# If ALLOWED_HOSTS is empty in DEBUG, allow localhost + LAN IPs for Expo Go.
 if not ALLOWED_HOSTS and DEBUG:
-    ALLOWED_HOSTS = ["127.0.0.1", "localhost", "testserver"]
+    ALLOWED_HOSTS = ["127.0.0.1", "localhost", "testserver", "192.168.100.38", "*"]
 
 # Production fallback: allow Render's default domain for healthchecks.
 # Pin to your exact domain in ALLOWED_HOSTS env var for production.

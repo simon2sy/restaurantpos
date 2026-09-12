@@ -5,7 +5,10 @@ from django.conf import settings
 
 
 class Expense(TimeStampedModel):
-    """A business expense record (supplies, rent, salaries, utilities...)."""
+    """A business expense record (supplies, rent, salaries, utilities...).
+
+    Each expense belongs to a specific restaurant (tenant).
+    """
 
     class Category(models.TextChoices):
         SUPPLIES = "SUPPLIES", "Supplies"
@@ -15,6 +18,12 @@ class Expense(TimeStampedModel):
         MAINTENANCE = "MAINTENANCE", "Maintenance"
         MARKETING = "MARKETING", "Marketing"
         OTHER = "OTHER", "Other"
+
+    restaurant = models.ForeignKey(
+        "core.Restaurant",
+        on_delete=models.CASCADE,
+        related_name="expenses",
+    )
 
     title = models.CharField(max_length=150)
     amount = models.DecimalField(max_digits=12, decimal_places=2)

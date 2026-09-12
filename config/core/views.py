@@ -59,21 +59,45 @@ def admin_dashboard(request):
     now = timezone.now()
     today = now.replace(hour=0, minute=0, second=0, microsecond=0)
 
-    todays_orders = Order.objects.filter(created_at__gte=today)
+    # Get the current restaurant from user's profile.
+    # Every employee must have a restaurant assigned; if not, show an
+    # error page instead of silently falling back to the default.
+    profile = getattr(request.user, "employee_profile", None)
+    if profile is not None and profile.restaurant is not None:
+        restaurant = profile.restaurant
+    else:
+        from django.core.exceptions import ImproperlyConfigured
+        from django.shortcuts import render as _render
+        return _render(
+            request,
+            "pages/error.html",
+            {
+                "title": "Restaurant Not Assigned",
+                "message": (
+                    "Your account has not been assigned to a restaurant yet. "
+                    "Please contact your administrator."
+                ),
+            },
+            status=403,
+        )
+
+    todays_orders = Order.objects.filter(restaurant=restaurant, created_at__gte=today)
 
     stats = {
         "orders_today": todays_orders.count(),
         "revenue_today": (
-            Order.objects.annotate(revenue_ts=Coalesce("paid_at", "created_at")).filter(
+            Order.objects.filter(restaurant=restaurant).annotate(revenue_ts=Coalesce("paid_at", "created_at")).filter(
                 revenue_ts__gte=today,
                 payment_status=Order.PaymentStatus.PAID,
             ).aggregate(total=Sum("total"))["total"]
             or 0
         ),
         "unpaid_orders": Order.objects.filter(
+            restaurant=restaurant,
             payment_status=Order.PaymentStatus.UNPAID,
         ).exclude(status=Order.Status.CANCELLED).count(),
         "open_orders": Order.objects.filter(
+            restaurant=restaurant,
             status__in=[
                 Order.Status.OPEN,
                 Order.Status.PREPARING,
@@ -82,26 +106,31 @@ def admin_dashboard(request):
             ]
         ).count(),
         "tables_occupied": Table.objects.filter(
+            restaurant=restaurant,
             status=Table.Status.OCCUPIED
         ).count(),
-        "tables_total": Table.objects.count(),
+        "tables_total": Table.objects.filter(restaurant=restaurant).count(),
         "cabins_occupied": Cabin.objects.filter(
+            restaurant=restaurant,
             status=Cabin.Status.OCCUPIED
         ).count(),
-        "cabins_total": Cabin.objects.count(),
+        "cabins_total": Cabin.objects.filter(restaurant=restaurant).count(),
         "kitchen_pending": OrderBatch.objects.filter(
+            restaurant=restaurant,
             status__in=[
                 OrderBatch.Status.PENDING,
                 OrderBatch.Status.PREPARING,
             ]
         ).count(),
         "active_employees": EmployeeProfile.objects.filter(
+            restaurant=restaurant,
             is_active=True
         ).count(),
     }
 
     recent_orders = (
         Order.objects
+        .filter(restaurant=restaurant)
         .select_related("table", "cabin", "created_by")
         .order_by("-created_at")[:10]
     )
@@ -109,6 +138,7 @@ def admin_dashboard(request):
     kitchen_queue = (
         OrderBatch.objects
         .filter(
+            restaurant=restaurant,
             status__in=[
                 OrderBatch.Status.PENDING,
                 OrderBatch.Status.PREPARING,
@@ -122,6 +152,7 @@ def admin_dashboard(request):
 
     employees = (
         EmployeeProfile.objects
+        .filter(restaurant=restaurant)
         .select_related("user")
         .order_by("user__first_name")
     )

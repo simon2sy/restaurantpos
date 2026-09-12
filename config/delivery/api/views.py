@@ -4,6 +4,7 @@ from rest_framework.views import APIView
 
 from accounts.models import EmployeeProfile
 from core.api_permissions import IsAnyStaff, IsDeliveryRole, IsSuperUserOrManager
+from core.tenant import TenantScopedMixin, get_tenant
 from delivery.models import Delivery, DeliveryPerson
 from delivery.services import (
     assign_delivery,
@@ -29,7 +30,7 @@ from .serializers import (
 # ============================================================
 
 
-class DeliveryPersonListCreateView(generics.ListCreateAPIView):
+class DeliveryPersonListCreateView(TenantScopedMixin, generics.ListCreateAPIView):
     """GET/POST /api/v1/delivery/persons/"""
 
     serializer_class = DeliveryPersonSerializer
@@ -40,13 +41,12 @@ class DeliveryPersonListCreateView(generics.ListCreateAPIView):
         return [IsAnyStaff()]
 
     def get_queryset(self):
-        return DeliveryPerson.objects.filter(is_active=True).order_by("name")
+        return super().get_queryset().filter(is_active=True).order_by("name")
 
 
-class DeliveryPersonDetailView(generics.RetrieveUpdateDestroyAPIView):
+class DeliveryPersonDetailView(TenantScopedMixin, generics.RetrieveUpdateDestroyAPIView):
     """GET/PUT/PATCH/DELETE /api/v1/delivery/persons/<pk>/"""
 
-    queryset = DeliveryPerson.objects.all()
     serializer_class = DeliveryPersonSerializer
 
     def get_permissions(self):
@@ -54,13 +54,16 @@ class DeliveryPersonDetailView(generics.RetrieveUpdateDestroyAPIView):
             return [IsSuperUserOrManager()]
         return [IsAnyStaff()]
 
+    def get_queryset(self):
+        return super().get_queryset()
+
 
 # ============================================================
 # DELIVERY ORDERS
 # ============================================================
 
 
-class DeliveryListCreateView(generics.ListCreateAPIView):
+class DeliveryListCreateView(TenantScopedMixin, generics.ListCreateAPIView):
     """GET/POST /api/v1/delivery/
 
     List all deliveries or create a new delivery order.
@@ -72,7 +75,7 @@ class DeliveryListCreateView(generics.ListCreateAPIView):
         return [IsAnyStaff()]
 
     def get_queryset(self):
-        qs = Delivery.objects.select_related("order", "assigned_person").order_by("-created_at")
+        qs = super().get_queryset().select_related("order", "assigned_person").order_by("-created_at")
         delivery_status = self.request.query_params.get("status")
         if delivery_status:
             qs = qs.filter(status=delivery_status)
@@ -88,12 +91,15 @@ class DeliveryListCreateView(generics.ListCreateAPIView):
 
         data = serializer.validated_data
 
-        # Resolve menu items
+        # Resolve menu items — must belong to the caller's restaurant
+        tenant = get_tenant(request)
         items = []
         for item_data in data["items"]:
             try:
                 menu_item = MenuItem.objects.get(
-                    pk=item_data["menu_item_id"], is_available=True
+                    pk=item_data["menu_item_id"],
+                    is_available=True,
+                    restaurant=tenant,
                 )
             except MenuItem.DoesNotExist:
                 return Response(
@@ -154,12 +160,14 @@ class DeliveryListCreateView(generics.ListCreateAPIView):
         )
 
 
-class DeliveryDetailView(generics.RetrieveUpdateDestroyAPIView):
+class DeliveryDetailView(TenantScopedMixin, generics.RetrieveUpdateDestroyAPIView):
     """GET /api/v1/delivery/<pk>/"""
 
-    queryset = Delivery.objects.select_related("order", "assigned_person")
     serializer_class = DeliverySerializer
     permission_classes = [IsAnyStaff]
+
+    def get_queryset(self):
+        return super().get_queryset().select_related("order", "assigned_person")
 
 
 # ============================================================
@@ -176,7 +184,8 @@ class DueDeliveriesView(APIView):
     permission_classes = [IsAnyStaff]
 
     def get(self, request):
-        deliveries = get_due_deliveries()
+        restaurant = get_tenant(request)
+        deliveries = get_due_deliveries(restaurant=restaurant)
         return Response(
             {
                 "success": True,
@@ -201,8 +210,16 @@ class AssignDeliveryView(APIView):
     permission_classes = [IsSuperUserOrManager]
 
     def post(self, request, pk):
+        # Get the delivery, scoped to the user's restaurant
+        restaurant = get_tenant(request)
+        if restaurant is None:
+            return Response(
+                {"success": False, "message": "No restaurant assigned.", "errors": {}},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
         try:
-            delivery = Delivery.objects.get(pk=pk)
+            delivery = Delivery.objects.get(pk=pk, restaurant=restaurant)
         except Delivery.DoesNotExist:
             return Response(
                 {"success": False, "message": "Delivery not found.", "errors": {}},
@@ -218,7 +235,9 @@ class AssignDeliveryView(APIView):
 
         try:
             person = DeliveryPerson.objects.get(
-                pk=serializer.validated_data["delivery_person_id"], is_active=True
+                pk=serializer.validated_data["delivery_person_id"],
+                is_active=True,
+                restaurant=restaurant,  # Ensure person belongs to same restaurant
             )
         except DeliveryPerson.DoesNotExist:
             return Response(
@@ -258,8 +277,16 @@ class DeliveryStatusChangeView(APIView):
     permission_classes = [IsAnyStaff]
 
     def patch(self, request, pk):
+        # Get the delivery, scoped to the user's restaurant
+        restaurant = get_tenant(request)
+        if restaurant is None:
+            return Response(
+                {"success": False, "message": "No restaurant assigned.", "errors": {}},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
         try:
-            delivery = Delivery.objects.get(pk=pk)
+            delivery = Delivery.objects.get(pk=pk, restaurant=restaurant)
         except Delivery.DoesNotExist:
             return Response(
                 {"success": False, "message": "Delivery not found.", "errors": {}},

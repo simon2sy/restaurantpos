@@ -1,7 +1,9 @@
-﻿from django.utils import timezone
+from django.utils import timezone
 from asgiref.sync import async_to_sync
 from channels.layers import get_channel_layer
 from orders.models import Order, OrderBatch
+
+from core.tenant import ws_tenant_group
 
 
 def start_batch(batch):
@@ -76,7 +78,7 @@ def notify_waiters_ready(batch):
 
     # --- Build human-readable message ---
     if delivery:
-        location = f"Delivery â†’ {delivery.customer_name}"
+        location = f"Delivery -> {delivery.customer_name}"
     elif table_num:
         location = f"Table {table_num}"
     elif cabin_num:
@@ -99,12 +101,13 @@ def notify_waiters_ready(batch):
 
     # --- Real-time push via WebSocket ---
     channel_layer = get_channel_layer()
+    restaurant = order.restaurant
 
-    if channel_layer is not None:
+    if channel_layer is not None and restaurant is not None:
         async_to_sync(
             channel_layer.group_send
         )(
-            "waiters",
+            ws_tenant_group(restaurant, "waiters"),
             {
                 "type": "order_ready",
                 "order_id": order.id,
@@ -125,13 +128,14 @@ def notify_waiters_ready(batch):
             },
         )
 
-    # --- FCM push notification to all waiters, cashiers, and managers (best-effort) ---
+    # --- FCM push notification scoped to this restaurant (best-effort) ---
     try:
         from core.push import send_push_to_role
-        # Notify waiters
+
+        # Notify waiters for this restaurant
         send_push_to_role(
             role="WAITER",
-            title="ðŸ½ï¸ Order Ready!",
+            title="Order Ready!",
             body=message,
             data={
                 "type": "order_ready",
@@ -140,11 +144,12 @@ def notify_waiters_ready(batch):
                 "batch_id": batch.id,
             },
             sound=True,
+            restaurant=order.restaurant,
         )
-        # Notify cashiers (they also handle orders)
+        # Notify cashiers for this restaurant
         send_push_to_role(
             role="CASHIER",
-            title="ðŸ½ï¸ Order Ready!",
+            title="Order Ready!",
             body=message,
             data={
                 "type": "order_ready",
@@ -153,11 +158,12 @@ def notify_waiters_ready(batch):
                 "batch_id": batch.id,
             },
             sound=True,
+            restaurant=order.restaurant,
         )
-        # Notify managers
+        # Notify managers for this restaurant
         send_push_to_role(
             role="MANAGER",
-            title="ðŸ½ï¸ Order Ready!",
+            title="Order Ready!",
             body=message,
             data={
                 "type": "order_ready",
@@ -166,6 +172,7 @@ def notify_waiters_ready(batch):
                 "batch_id": batch.id,
             },
             sound=True,
+            restaurant=order.restaurant,
         )
     except Exception:
         # Push notifications are best-effort; never block kitchen workflow.
@@ -216,10 +223,14 @@ def notify_kitchen(batch):
             "customer_phone": order.delivery.customer_phone,
         }
 
+    restaurant = batch.order.restaurant
+    if restaurant is None:
+        return  # Cannot broadcast without a restaurant context
+
     async_to_sync(
         channel_layer.group_send
     )(
-        "kitchen",
+        ws_tenant_group(restaurant, "kitchen"),
         {
             "type": "kitchen_order",
             "batch_id": batch.id,
@@ -241,14 +252,14 @@ def notify_kitchen(batch):
         },
     )
 
-    # --- FCM push notification to all kitchen staff and managers (best-effort) ---
+    # --- FCM push notification scoped to this restaurant (best-effort) ---
     try:
         from core.push import send_push_to_role
 
         table_num = batch.order.table.number if batch.order.table_id else None
         cabin_num = batch.order.cabin.number if batch.order.cabin_id else None
         if delivery_info:
-            location = f"Delivery â\u2192 {delivery_info['customer_name']}"
+            location = f"Delivery -> {delivery_info['customer_name']}"
         elif table_num:
             location = f"Table {table_num}"
         elif cabin_num:
@@ -262,10 +273,10 @@ def notify_kitchen(batch):
         if len(items) > 3:
             items_text += f" +{len(items) - 3} more"
 
-        # Notify kitchen staff
+        # Notify kitchen staff for this restaurant
         send_push_to_role(
             role="KITCHEN",
-            title=f"ðŸ\u201d¥ New Order #{batch.order.order_number}",
+            title=f"New Order #{batch.order.order_number}",
             body=f"{location}: {items_text}",
             data={
                 "type": "new_order",
@@ -274,11 +285,12 @@ def notify_kitchen(batch):
                 "batch_id": batch.id,
             },
             sound=True,
+            restaurant=order.restaurant,
         )
-        # Also notify managers
+        # Also notify managers for this restaurant
         send_push_to_role(
             role="MANAGER",
-            title=f"ðŸ\u201d¥ New Order #{batch.order.order_number}",
+            title=f"New Order #{batch.order.order_number}",
             body=f"{location}: {items_text}",
             data={
                 "type": "new_order",
@@ -287,6 +299,7 @@ def notify_kitchen(batch):
                 "batch_id": batch.id,
             },
             sound=True,
+            restaurant=order.restaurant,
         )
     except Exception:
         # Push notifications are best-effort; never block kitchen workflow.
@@ -301,15 +314,17 @@ def notify_batch_status(batch):
             "CHANNEL_LAYERS is not configured."
         )
 
+    restaurant = batch.order.restaurant
+    if restaurant is None:
+        return  # Cannot broadcast without a restaurant context
+
     async_to_sync(
         channel_layer.group_send
     )(
-        "kitchen",
+        ws_tenant_group(restaurant, "kitchen"),
         {
             "type": "kitchen_status",
             "batch_id": batch.id,
             "status": batch.status,
         },
     )
-
-

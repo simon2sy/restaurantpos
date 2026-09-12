@@ -4,6 +4,7 @@ from rest_framework.views import APIView
 
 from accounts.models import EmployeeProfile
 from core.api_permissions import IsSuperUser, IsManager, IsSuperUserOrManager, IsAnyStaff
+from core.tenant import TenantScopedMixin, get_tenant
 from menu.models import Category, Ingredient, MenuItem, RecipeItem, StockMovement
 from orders.services import deduct_inventory
 
@@ -34,13 +35,25 @@ class CategoryListCreateView(generics.ListCreateAPIView):
         return [IsAnyStaff()]
 
     def get_queryset(self):
-        return Category.objects.prefetch_related("items").order_by("display_order", "name")
+        qs = Category.objects.prefetch_related("items").order_by("display_order", "name")
+        # Filter by restaurant for non-superusers
+        profile = getattr(self.request.user, "employee_profile", None)
+        if profile and profile.restaurant:
+            qs = qs.filter(restaurant=profile.restaurant)
+        return qs
 
 
 class CategoryDetailView(generics.RetrieveUpdateDestroyAPIView):
     """GET/PUT/PATCH/DELETE /api/v1/menu/categories/<pk>/"""
 
-    queryset = Category.objects.prefetch_related("items")
+    def get_queryset(self):
+        qs = Category.objects.prefetch_related("items")
+        # Filter by restaurant for non-superusers
+        profile = getattr(self.request.user, "employee_profile", None)
+        if profile and profile.restaurant:
+            qs = qs.filter(restaurant=profile.restaurant)
+        return qs
+
     serializer_class = CategorySerializer
 
     def get_permissions(self):
@@ -71,6 +84,10 @@ class MenuItemListCreateView(generics.ListCreateAPIView):
 
     def get_queryset(self):
         qs = MenuItem.objects.select_related("category").order_by("category__display_order", "display_order", "name")
+        # Filter by restaurant for non-superusers
+        profile = getattr(self.request.user, "employee_profile", None)
+        if profile and profile.restaurant:
+            qs = qs.filter(restaurant=profile.restaurant)
         # Filter by category if provided
         category_id = self.request.query_params.get("category")
         if category_id:
@@ -85,7 +102,14 @@ class MenuItemListCreateView(generics.ListCreateAPIView):
 class MenuItemDetailView(generics.RetrieveUpdateDestroyAPIView):
     """GET/PUT/PATCH/DELETE /api/v1/menu/items/<pk>/"""
 
-    queryset = MenuItem.objects.select_related("category")
+    def get_queryset(self):
+        qs = MenuItem.objects.select_related("category")
+        # Filter by restaurant for non-superusers
+        profile = getattr(self.request.user, "employee_profile", None)
+        if profile and profile.restaurant:
+            qs = qs.filter(restaurant=profile.restaurant)
+        return qs
+
     serializer_class = MenuItemSerializer
 
     def get_permissions(self):
@@ -112,7 +136,12 @@ class IngredientListCreateView(generics.ListCreateAPIView):
         return [IsAnyStaff()]
 
     def get_queryset(self):
-        return Ingredient.objects.order_by("name")
+        qs = Ingredient.objects.order_by("name")
+        # Filter by restaurant for non-superusers
+        profile = getattr(self.request.user, "employee_profile", None)
+        if profile and profile.restaurant:
+            qs = qs.filter(restaurant=profile.restaurant)
+        return qs
 
     def get_serializer_context(self):
         context = super().get_serializer_context()
@@ -123,7 +152,14 @@ class IngredientListCreateView(generics.ListCreateAPIView):
 class IngredientDetailView(generics.RetrieveUpdateDestroyAPIView):
     """GET/PUT/PATCH/DELETE /api/v1/menu/ingredients/<pk>/"""
 
-    queryset = Ingredient.objects.all()
+    def get_queryset(self):
+        qs = Ingredient.objects.all()
+        # Filter by restaurant for non-superusers
+        profile = getattr(self.request.user, "employee_profile", None)
+        if profile and profile.restaurant:
+            qs = qs.filter(restaurant=profile.restaurant)
+        return qs
+
     serializer_class = IngredientSerializer
 
     def get_permissions(self):
@@ -131,9 +167,7 @@ class IngredientDetailView(generics.RetrieveUpdateDestroyAPIView):
             return [IsSuperUser()]
         if self.request.method in ("PUT", "PATCH"):
             return [IsSuperUserOrManager()]
-        return [IsAnyStaff()]# ============================================================
-# MENU ITEM STOCK CHECK
-# ============================================================
+        return [IsAnyStaff()]
 
 
 class MenuItemStockView(APIView):
@@ -146,8 +180,16 @@ class MenuItemStockView(APIView):
     permission_classes = [IsAnyStaff]
 
     def get(self, request, pk):
+        # Get the menu item, scoped to the user's restaurant
+        restaurant = get_tenant(request)
+        if restaurant is None:
+            return Response(
+                {"success": False, "message": "No restaurant assigned.", "errors": {}},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
         try:
-            menu_item = MenuItem.objects.get(pk=pk)
+            menu_item = MenuItem.objects.get(pk=pk, restaurant=restaurant)
         except MenuItem.DoesNotExist:
             return Response(
                 {"success": False, "message": "Menu item not found.", "errors": {}},
@@ -244,7 +286,14 @@ class RecipeItemListView(generics.ListCreateAPIView):
     permission_classes = [IsSuperUserOrManager]
 
     def get_queryset(self):
-        qs = RecipeItem.objects.select_related("ingredient", "menu_item").order_by("menu_item__name", "ingredient__name")
+        # Scope to the user's restaurant via the menu_item relationship
+        restaurant = get_tenant(self.request)
+        if restaurant is None:
+            return RecipeItem.objects.none()
+
+        qs = RecipeItem.objects.select_related("ingredient", "menu_item").filter(
+            menu_item__restaurant=restaurant
+        ).order_by("menu_item__name", "ingredient__name")
         menu_item_id = self.request.query_params.get("menu_item")
         if menu_item_id:
             qs = qs.filter(menu_item_id=menu_item_id)
@@ -254,9 +303,18 @@ class RecipeItemListView(generics.ListCreateAPIView):
 class RecipeItemDetailView(generics.RetrieveUpdateDestroyAPIView):
     """GET/PUT/PATCH/DELETE /api/v1/menu/recipes/<pk>/"""
 
-    queryset = RecipeItem.objects.select_related("ingredient", "menu_item")
     serializer_class = RecipeItemSerializer
     permission_classes = [IsSuperUserOrManager]
+
+    def get_queryset(self):
+        # Scope to the user's restaurant via the menu_item relationship
+        restaurant = get_tenant(self.request)
+        if restaurant is None:
+            return RecipeItem.objects.none()
+
+        return RecipeItem.objects.select_related("ingredient", "menu_item").filter(
+            menu_item__restaurant=restaurant
+        )
 
 
 # ============================================================
@@ -271,7 +329,14 @@ class StockMovementListView(generics.ListAPIView):
     permission_classes = [IsSuperUserOrManager]
 
     def get_queryset(self):
-        qs = StockMovement.objects.select_related("ingredient", "by_user").order_by("-created_at")
+        # Scope to the user's restaurant via the ingredient relationship
+        restaurant = get_tenant(self.request)
+        if restaurant is None:
+            return StockMovement.objects.none()
+
+        qs = StockMovement.objects.select_related("ingredient", "by_user").filter(
+            ingredient__restaurant=restaurant
+        ).order_by("-created_at")
         ingredient_id = self.request.query_params.get("ingredient")
         if ingredient_id:
             qs = qs.filter(ingredient_id=ingredient_id)
@@ -296,7 +361,20 @@ class LowStockCheckView(APIView):
         """GET returns the list of low stock items without sending alerts."""
         from django.db.models import F
 
+        # Scope to the user's restaurant
+        restaurant = get_tenant(request)
+        if restaurant is None:
+            return Response(
+                {
+                    "success": True,
+                    "message": "0 items below minimum stock.",
+                    "data": [],
+                },
+                status=status.HTTP_200_OK,
+            )
+
         items = Ingredient.objects.filter(
+            restaurant=restaurant,
             is_active=True,
             current_stock__lte=F("minimum_stock"),
         ).order_by("name")

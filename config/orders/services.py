@@ -3,6 +3,7 @@ from decimal import Decimal
 from django.db import transaction
 from django.utils import timezone
 
+from core.tenant import enforce_same_tenant
 from .models import (
     Cabin,
     Order,
@@ -12,6 +13,32 @@ from .models import (
 )
 
 from kitchen.services import notify_kitchen
+
+
+# ============================================================
+# CROSS-RESTAURANT FK VALIDATION
+# ============================================================
+
+
+def validate_same_restaurant(*objects, label="objects"):
+    """Validate that all given objects belong to the same restaurant.
+
+    Raises ValueError if any object has a different restaurant assignment.
+    This prevents cross-restaurant data corruption such as:
+    - Restaurant A Order -> Restaurant B Product
+    - Restaurant A OrderItem -> Restaurant B Order
+    - Restaurant A Table -> Restaurant B Order
+    """
+    restaurants = set()
+    for obj in objects:
+        restaurant = getattr(obj, "restaurant", None)
+        if restaurant is not None:
+            restaurants.add(restaurant.id)
+
+    if len(restaurants) > 1:
+        raise ValueError(
+            f"Cross-restaurant references are not allowed for {label}."
+        )
 
 
 # ============================================================
@@ -25,6 +52,7 @@ def create_order(
     table=None,
     cabin=None,
     order_type=Order.OrderType.DINE_IN,
+    restaurant=None,
 ):
 
     # ========================================================
@@ -116,10 +144,41 @@ def create_order(
         )
 
     # ========================================================
+    # RESOLVE RESTAURANT
+    # ========================================================
+    if restaurant is None:
+        # Infer restaurant from table/cabin or user's profile
+        if table:
+            restaurant = table.restaurant
+        elif cabin:
+            restaurant = cabin.restaurant
+        else:
+            from core.services import get_current_restaurant_from_user
+            restaurant = get_current_restaurant_from_user(user)
+
+    # ========================================================
+    # CROSS-RESTAURANT VALIDATION
+    # ========================================================
+    # Ensure table/cabin belong to the same restaurant
+    if table is not None:
+        validate_same_restaurant(
+            table,
+            restaurant,
+            label="table and restaurant",
+        )
+    if cabin is not None:
+        validate_same_restaurant(
+            cabin,
+            restaurant,
+            label="cabin and restaurant",
+        )
+
+    # ========================================================
     # CREATE ORDER
     # ========================================================
 
     order = Order.objects.create(
+        restaurant=restaurant,
         order_type=order_type,
         table=table,
         cabin=cabin,
@@ -158,6 +217,7 @@ def create_order_batch(
     )
 
     batch = OrderBatch.objects.create(
+        restaurant=order.restaurant,
         order=order,
         batch_number=batch_number,
     )
@@ -169,6 +229,13 @@ def create_order_batch(
     for item in items:
 
         menu_item = item["menu_item"]
+
+        # CROSS-RESTAURANT VALIDATION: Ensure menu item belongs to same restaurant
+        validate_same_restaurant(
+            order,
+            menu_item,
+            label="order and menu item",
+        )
 
         quantity = item["quantity"]
 
@@ -194,6 +261,7 @@ def create_order_batch(
         _validate_stock(menu_item, quantity)
 
         OrderItem.objects.create(
+            restaurant=order.restaurant,
             batch=batch,
             menu_item=menu_item,
             quantity=quantity,
@@ -386,8 +454,9 @@ def complete_payment(
             elif hasattr(order, 'delivery') and order.delivery:
                 location = f"Delivery - {order.delivery.customer_name}"
 
+            restaurant_id = order.restaurant_id or 0
             async_to_sync(channel_layer.group_send)(
-                "dashboard",
+                f"dashboard_{restaurant_id}",
                 {
                     "type": "payment_received",
                     "order_id": order.id,
@@ -418,11 +487,13 @@ def complete_payment(
         from accounts.models import EmployeeProfile
         from django.contrib.auth.models import User
 
-        # Get all active manager users
+        # Get all active manager users for this restaurant
         manager_profiles = EmployeeProfile.objects.filter(
             role__in=[EmployeeProfile.Role.MANAGER],
             is_active=True,
         ).select_related("user")
+        if order.restaurant:
+            manager_profiles = manager_profiles.filter(restaurant=order.restaurant)
 
         manager_users = [profile.user for profile in manager_profiles]
         logger.info(f"Found {len(manager_users)} manager users")
@@ -527,8 +598,9 @@ def notify_waiters_served(order):
     if channel_layer is None:
         return
 
+    restaurant_id = order.restaurant_id or 0
     async_to_sync(channel_layer.group_send)(
-        "waiters",
+        f"waiters_{restaurant_id}",
         {
             "type": "order_served",
             "order_number": order.order_number,

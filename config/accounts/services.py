@@ -2,17 +2,15 @@ from io import BytesIO
 
 import qrcode
 from django.http import HttpResponse
-from django.urls import reverse
 
 
 def get_login_url_for_token(request, token):
-    """Absolute secure login URL embedded in the QR.
+    """Payload embedded in the QR.
 
-    Only a token is present in the QR - no sensitive data.
+    The QR contains the raw token only — the React Native app scans it
+    and POSTs the token to /api/v1/auth/qr-login/. No sensitive data.
     """
-    return request.build_absolute_uri(
-        reverse("accounts:qr_login", args=[token])
-    )
+    return str(token)
 
 
 def generate_employee_qr(employee, request):

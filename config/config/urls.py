@@ -15,42 +15,22 @@ Including another URLconf
     2. Add a URL to urlpatterns:  path('blog/', include('blog.urls'))
 """
 from django.contrib import admin
-from django.urls import path,include
-
-from core import views as core_views
+from django.urls import path, include
+from django.views.generic import RedirectView
 
 urlpatterns = [
-    # ── DRF API (must come first to avoid conflicts with web URLs) ──
+    # ── DRF API (the React Native frontend's only entry point) ──
     path("api/", include("config.api_urls")),
 
+    # ── Django admin panel (platform admin only) ──
+    path("admin/", admin.site.urls),
+
+    # Root redirects to the admin panel. The legacy server-rendered
+    # template views were removed — the frontend is React Native,
+    # which talks exclusively to the DRF API above.
     path(
         "",
-        core_views.home,
+        RedirectView.as_view(url="/admin/", permanent=False),
         name="root",
     ),
-    path('admin/', admin.site.urls),
-    path('restaurant/', include('core.urls')),
-    path(
-        "accounts/",
-        include("accounts.urls"),),
-    path(
-        "orders/",
-        include("orders.urls"),
-    ),
-    path(
-    "menu/",
-    include("menu.urls"),
-),
-    path(
-    "kitchen/",
-    include("kitchen.urls"),
-),
-    path(
-    "delivery/",
-    include("delivery.urls"),
-),
-    path(
-    "reports/",
-    include("reports.urls"),
-),
 ]
